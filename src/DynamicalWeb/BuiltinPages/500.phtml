@@ -1,0 +1,105 @@
+<?php
+    use DynamicalWeb\Html\Functions;
+    use DynamicalWeb\WebSession;
+    
+    $exception = WebSession::getException();
+    $showDetails = WebSession::getInstance()?->getWebConfiguration()->getApplication()->errorReportingEnabled() ?? false;
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>500 Internal Server Error</title>
+    <link rel="stylesheet" href="/dynaweb/style.css">
+</head>
+<body>
+    <div class="dw-container">
+        <table class="dw-main-table">
+            <!-- Header -->
+            <tr>
+                <td class="dw-header">
+                    <div class="dw-header-content">
+                        <div class="dw-header-title">500 Internal Server Error</div>
+                        <div class="dw-header-info">DynamicalWeb | Version 1.0.0</div>
+                    </div>
+                </td>
+            </tr>
+
+            <!-- Body -->
+            <tr>
+                <td class="dw-body">
+                    <table class="dw-content-table">
+                        <tr>
+                            <td class="dw-section-header">System Message</td>
+                        </tr>
+                        <tr>
+                            <td class="dw-section-body">
+                                <table class="dw-info-table">
+                                    <tr>
+                                        <td class="dw-label-cell">Request ID:</td>
+                                        <td class="dw-value-cell"><pre><?php Functions::print(WebSession::getRequest()->getId()); ?></pre></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="dw-label-cell">Method:</td>
+                                        <td class="dw-value-cell"><pre><?php Functions::print(WebSession::getRequest()->getMethod()->value); ?></pre></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="dw-label-cell">Path:</td>
+                                        <td class="dw-value-cell"><pre><?php Functions::print(WebSession::getRequest()->getPath()); ?></pre></td>
+                                    </tr>
+                                </table>
+
+                                <div class="dw-message-box">
+                                    <div class="dw-message-title">Description:</div>
+                                    <div class="dw-message-text">
+                                        An unexpected error occurred while processing your request. The server encountered an internal error and was unable to complete your request.
+                                    </div>
+                                </div>
+
+                                <?php if ($showDetails && $exception !== null): ?>
+                                <div class="dw-message-box">
+                                    <div class="dw-message-title">Error Details:</div>
+                                    <div class="dw-message-text">
+                                        <strong>Exception:</strong> <?php Functions::print(get_class($exception)); ?><br>
+                                        <strong>Message:</strong> <?php Functions::print($exception->getMessage()); ?><br>
+                                        <strong>File:</strong> <?php Functions::print($exception->getFile()); ?><br>
+                                        <strong>Line:</strong> <?php Functions::print($exception->getLine()); ?>
+                                    </div>
+                                    <?php if ($exception->getPrevious() !== null): ?>
+                                    <div class="dw-message-text">
+                                        <strong>Caused by:</strong> <?php Functions::print(get_class($exception->getPrevious())); ?><br>
+                                        <strong>Message:</strong> <?php Functions::print($exception->getPrevious()->getMessage()); ?>
+                                    </div>
+                                    <?php endif; ?>
+                                    <div class="dw-message-text">
+                                        <pre><?php Functions::print($exception->getTraceAsString()); ?></pre>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
+
+                                <div class="dw-actions-box">
+                                    <div class="dw-actions-title">Recommended Actions:</div>
+                                    <ul class="dw-actions-list">
+                                        <li>Refresh the page and try again</li>
+                                        <li>Return to the system homepage</li>
+                                        <li>Contact your system administrator for assistance</li>
+                                        <li>Check the system logs for additional information</li>
+                                    </ul>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+                <td class="dw-footer">
+                    <div class="dw-footer-content">© 2022-2026 Nosial. All rights reserved.</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>

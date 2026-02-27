@@ -1,0 +1,80 @@
+<?php
+    use DynamicalWeb\Html\Functions;
+    use DynamicalWeb\WebSession;
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DynamicalWeb</title>
+    <link rel="stylesheet" href="/dynaweb/style.css">
+</head>
+<body>
+    <div class="dw-container">
+        <table class="dw-main-table">
+            <!-- Header -->
+            <tr>
+                <td class="dw-header">
+                    <div class="dw-header-content">
+                        <div class="dw-header-title">DynamicalWeb</div>
+                        <div class="dw-header-info">The light-weight ncc web framework</div>
+                    </div>
+                </td>
+            </tr>
+
+            <!-- Body -->
+            <tr>
+                <td class="dw-body">
+                    <table class="dw-content-table">
+                        <tr>
+                            <td class="dw-section-header">Framework Information</td>
+                        </tr>
+                        <tr>
+                            <td class="dw-section-body">
+                                <table class="dw-info-table">
+                                    <tr>
+                                        <td class="dw-label-cell">Request ID:</td>
+                                        <td class="dw-value-cell"><?PHP Functions::print(WebSession::getRequest()->getId()); ?></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="dw-label-cell">Framework:</td>
+                                        <td class="dw-value-cell">DynamicalWeb</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="dw-label-cell">Web Application:</td>
+                                        <td class="dw-value-cell"><?php Functions::print(WebSession::getInstance()->getWebConfiguration()->getApplication()->getName()); ?></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="dw-label-cell">Error Reporting:</td>
+                                        <?php
+                                            if(WebSession::getInstance()->getWebConfiguration()->getApplication()->errorReportingEnabled())
+                                            {
+                                                ?><td class="dw-value-cell dw-status-warning">Enabled (Should be disabled in production environments)</td><?php
+                                            }
+                                            else
+                                            {
+                                                ?><td class="dw-value-cell">Disabled</td><?php
+                                            }
+                                        ?>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+
+                </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+                <td class="dw-footer">
+                    <div class="dw-footer-content">
+                        © 2022-2026 Nosial. All rights reserved.
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>

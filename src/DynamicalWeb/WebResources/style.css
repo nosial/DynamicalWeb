@@ -1,0 +1,208 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #e4e8ec;
+    font-family: Verdana, Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    color: #333333;
+    padding: 20px;
+}
+
+.dw-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.dw-main-table {
+    width: 100%;
+    border: 1px solid #5b7fa6;
+    background-color: #ffffff;
+    box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Header */
+.dw-header {
+    background: linear-gradient(to bottom, #5b86b5 0%, #3d5a7e 100%);
+    border-bottom: 2px solid #2d4a6e;
+    padding: 10px 15px;
+}
+
+.dw-header-content {
+    color: #ffffff;
+}
+
+.dw-header-title {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 3px;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.dw-header-info {
+    font-size: 10px;
+    color: #d4e1f5;
+}
+
+/* Body */
+.dw-body {
+    background-color: #f5f7fa;
+    padding: 15px;
+}
+
+.dw-content-table {
+    width: 100%;
+    border: 1px solid #9badbd;
+    background-color: #ffffff;
+}
+
+.dw-section-header {
+    background: linear-gradient(to bottom, #d4dce5 0%, #c4cdd7 100%);
+    border-bottom: 1px solid #9badbd;
+    padding: 8px 12px;
+    font-weight: bold;
+    color: #2c4a6b;
+    font-size: 12px;
+}
+
+.dw-section-body {
+    padding: 15px;
+    background-color: #ffffff;
+}
+
+.dw-info-table {
+    width: 100%;
+    background-color: #e8ecf0;
+    border: 1px solid #c4cdd7;
+    margin-bottom: 15px;
+}
+
+.dw-label-cell {
+    background-color: #d4dce5;
+    font-weight: bold;
+    color: #2c4a6b;
+    width: 150px;
+    border-right: 1px solid #9badbd;
+}
+
+.dw-value-cell {
+    background-color: #ffffff;
+    color: #333333;
+}
+
+.dw-status-error {
+    color: #cc0000;
+    font-weight: bold;
+}
+
+.dw-status-warning {
+    color: #e67e22;
+    font-weight: bold;
+}
+
+.dw-message-box {
+    border: 1px solid #c4cdd7;
+    background-color: #fffcf0;
+    padding: 12px;
+    margin-bottom: 15px;
+}
+
+.dw-message-title {
+    font-weight: bold;
+    color: #2c4a6b;
+    margin-bottom: 8px;
+    font-size: 11px;
+}
+
+.dw-message-text {
+    color: #333333;
+    line-height: 1.5;
+}
+
+.dw-actions-box {
+    border: 1px solid #b8d4b8;
+    background-color: #f0f8f0;
+    padding: 12px;
+}
+
+.dw-actions-title {
+    font-weight: bold;
+    color: #2c4a6b;
+    margin-bottom: 8px;
+    font-size: 11px;
+}
+
+.dw-actions-list {
+    margin-left: 20px;
+    color: #333333;
+}
+
+.dw-actions-list li {
+    margin-bottom: 5px;
+    line-height: 1.4;
+}
+
+/* Footer */
+.dw-footer {
+    background: linear-gradient(to bottom, #e4e8ec 0%, #d4d8dc 100%);
+    border-top: 1px solid #9badbd;
+    padding: 8px 15px;
+}
+
+.dw-footer-content {
+    color: #666666;
+    font-size: 10px;
+    text-align: center;
+}
+
+.dw-footer-content a {
+    color: #3d5a7e;
+    text-decoration: none;
+}
+
+.dw-footer-content a:hover {
+    text-decoration: underline;
+}
+
+/* Tabs */
+.dw-tab-bar {
+    background: #c4cdd7;
+    border-bottom: 2px solid #5b7fa6;
+    padding: 4px 8px 0 8px;
+    display: flex;
+    gap: 3px;
+}
+
+.dw-tab-btn {
+    background: linear-gradient(to bottom, #d4dce5 0%, #b8c2cc 100%);
+    border: 1px solid #5b7fa6;
+    border-bottom: none;
+    color: #2c4a6b;
+    font-family: Verdana, Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 3px 12px 4px 12px;
+    cursor: pointer;
+    margin-bottom: -2px;
+}
+
+.dw-tab-btn:hover {
+    background: linear-gradient(to bottom, #dce4ed 0%, #c4cdd7 100%);
+}
+
+.dw-tab-btn.dw-active {
+    background: #ffffff;
+    border-bottom: 2px solid #ffffff;
+    color: #2c4a6b;
+}
+
+.dw-tab-content {
+    display: none;
+}
+
+.dw-tab-content.dw-active {
+    display: block;
+}
