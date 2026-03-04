@@ -1,15 +1,17 @@
 <?php
 
-    namespace DynamicalWeb\Classes\DebugPanel;
+    namespace DynamicalWeb\Abstract;
 
-    class Shared
+    abstract class AbstractTabBuilder
     {
-        public static function escape(string $str): string
+        abstract public static function build(): string;
+
+        protected static function escape(string $str): string
         {
             return htmlspecialchars($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
 
-        public static function formatTime(float $seconds): string
+        protected static function formatTime(float $seconds): string
         {
             if ($seconds < 0.001)
             {
@@ -24,7 +26,7 @@
             return number_format($seconds, 3) . ' s';
         }
 
-        public static function formatBytes(int $bytes): string
+        protected static function formatBytes(int $bytes): string
         {
             $units = ['B', 'KB', 'MB', 'GB', 'TB'];
             $bytes = max($bytes, 0);
@@ -33,13 +35,13 @@
             return round($bytes / (1 << (10 * $pow)), 2) . ' ' . $units[$pow];
         }
 
-        public static function buildSection(string $title, string $content): string
+        protected static function buildSection(string $title, string $content): string
         {
             return '<tr><td colspan="6" class="dw-section-divider">' . $title . '</td></tr>' .
                    '<tr><td colspan="6" style="padding: 0;">' . $content . '</td></tr>';
         }
 
-        public static function buildParametersHtml(array $params, string $emptyMessage = 'None'): string
+        protected static function buildParametersHtml(array $params, string $emptyMessage = 'None'): string
         {
             if (empty($params))
             {
@@ -65,7 +67,7 @@
             return $html;
         }
 
-        public static function buildFileItem(string $escapedPath, string $type): string
+        protected static function buildFileItem(string $escapedPath, string $type): string
         {
             return '<div class="dw-file-item">'
                  . '<span class="dw-file-type">' . self::escape($type) . '</span>'
@@ -73,7 +75,7 @@
                  . '</div>';
         }
 
-        public static function buildUserAgentHtml($userAgent): string
+        protected static function buildUserAgentHtml($userAgent): string
         {
             if ($userAgent === null)
             {
@@ -116,7 +118,7 @@
             return self::buildParametersHtml($data);
         }
 
-        public static function buildRawBodyPreviewHtml(string $body): string
+        protected static function buildRawBodyPreviewHtml(string $body): string
         {
             $limit   = 1000;
             $preview = mb_substr($body, 0, $limit, 'UTF-8');
