@@ -1,10 +1,16 @@
 <?php
 
-namespace DynamicalWeb\Exceptions;
+    namespace DynamicalWeb\Exceptions;
 
-use DynamicalWeb\Exceptions\DynamicalWebException;
+    use Throwable;
 
-class ExecutionException extends DynamicalWebException
-{
-
-}
+    class ExecutionException extends DynamicalWebException
+    {
+        /**
+         * @inheritDoc
+         */
+        public function __construct(string $message="", int $code=0, ?Throwable $previous=null)
+        {
+            parent::__construct($message, $code, $previous);
+        }
+    }
