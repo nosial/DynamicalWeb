@@ -2,11 +2,16 @@
 
     namespace DynamicalWeb\Classes\DebugPanel;
 
+    use DynamicalWeb\Abstract\AbstractTabBuilder;
     use DynamicalWeb\Classes\DebugPanel as DebugPanelClass;
     use DynamicalWeb\WebSession;
+    use Throwable;
 
-    class AppTabBuilder
+    class AppTabBuilder extends AbstractTabBuilder
     {
+        /**
+         * @inheritDoc
+         */
         public static function build(): string
         {
             $appName = $appXssLevel = $appErrReport = 'N/A';
@@ -22,12 +27,12 @@
                 {
                     $appCfg           = $instance->getWebConfiguration()->getApplication();
                     $routerCfg        = $instance->getWebConfiguration()->getRouter();
-                    $appName          = Shared::escape($appCfg->getName());
-                    $appXssLevel      = Shared::escape($appCfg->getXssLevel()->name);
+                    $appName          = self::escape($appCfg->getName());
+                    $appXssLevel      = self::escape($appCfg->getXssLevel()->name);
                     $appErrReport     = $appCfg->errorReportingEnabled() ? 'Enabled' : 'Disabled';
-                    $routerBaseUrl    = Shared::escape($routerCfg->getBaseUrl());
-                    $routerBasePath   = Shared::escape($routerCfg->getBasePath());
-                    $defaultLocale    = Shared::escape($appCfg->getDefaultLocale() ?? 'None');
+                    $routerBaseUrl    = self::escape($routerCfg->getBaseUrl());
+                    $routerBasePath   = self::escape($routerCfg->getBasePath());
+                    $defaultLocale    = self::escape($appCfg->getDefaultLocale() ?? 'None');
                     $pre              = $appCfg->getPreRequest();
                     $post             = $appCfg->getPostRequest();
                     $preRequest       = $pre  ? implode(', ', $pre)  : 'None';
@@ -35,8 +40,8 @@
                     $routeCount       = (string) count($routerCfg->getRoutes());
                     $localeCodes      = $instance->getAvailableLocaleCodes();
                     $availableLocales = $localeCodes ? implode(', ', $localeCodes) : 'None';
-                    $webRoot          = Shared::escape($instance->getWebRootPath());
-                    $webResources     = Shared::escape($instance->getWebResourcesPath());
+                    $webRoot          = self::escape($instance->getWebRootPath());
+                    $webResources     = self::escape($instance->getWebResourcesPath());
 
                     $sections     = $instance->getSections();
                     $sectionNames = $sections ? implode(', ', array_keys($sections)) : 'None';
@@ -59,14 +64,14 @@
                     $debugPanel = $appCfg->isDebugPanelEnabled() ? 'Enabled' : 'Disabled';
                 }
             }
-            catch (\Throwable) {}
+            catch (Throwable) {}
 
             $elapsed     = microtime(true) - DebugPanelClass::$startTime;
             $memCurrent  = memory_get_usage(true);
             $memDelta    = $memCurrent - (int) DebugPanelClass::$startMemory;
-            $memDeltaStr = ($memDelta >= 0 ? '+' : '-') . Shared::formatBytes(abs($memDelta));
+            $memDeltaStr = ($memDelta >= 0 ? '+' : '-') . self::formatBytes(abs($memDelta));
 
-            return Shared::buildSection('Application', Shared::buildParametersHtml([
+            return self::buildSection('Application', self::buildParametersHtml([
                 'Name'              => $appName,
                 'Error Reporting'   => $appErrReport,
                 'XSS Protection'    => $appXssLevel,
@@ -82,14 +87,14 @@
                 'Response Handlers' => $responseHandlers,
                 'Pre-Request'       => $preRequest,
                 'Post-Request'      => $postRequest,
-            ])) . Shared::buildSection('Runtime', Shared::buildParametersHtml([
-                'Elapsed Time'     => Shared::formatTime($elapsed),
-                'Memory at Start'  => Shared::formatBytes((int) DebugPanelClass::$startMemory),
-                'Memory Current'   => Shared::formatBytes($memCurrent),
-                'Memory Peak'      => Shared::formatBytes(memory_get_peak_usage(true)),
+            ])) . self::buildSection('Runtime', self::buildParametersHtml([
+                'Elapsed Time'     => self::formatTime($elapsed),
+                'Memory at Start'  => self::formatBytes((int) DebugPanelClass::$startMemory),
+                'Memory Current'   => self::formatBytes($memCurrent),
+                'Memory Peak'      => self::formatBytes(memory_get_peak_usage(true)),
                 'Memory Delta'     => $memDeltaStr,
                 'PHP Request Time' => isset($_SERVER['REQUEST_TIME_FLOAT'])
-                    ? Shared::formatTime(microtime(true) - (float) $_SERVER['REQUEST_TIME_FLOAT'])
+                    ? self::formatTime(microtime(true) - (float) $_SERVER['REQUEST_TIME_FLOAT'])
                     : 'N/A',
             ]));
         }

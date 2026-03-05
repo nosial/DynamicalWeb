@@ -2,24 +2,35 @@
 
     namespace DynamicalWeb\Classes\DebugPanel;
 
+    use DynamicalWeb\Abstract\AbstractTabBuilder;
+    use DynamicalWeb\Classes\DebugPanel as DebugPanelClass;
     use DynamicalWeb\Objects\Response;
 
-    class CookiesTabBuilder
+    class CookiesTabBuilder extends AbstractTabBuilder
     {
-        public static function build(Response $response): string
+        /**
+         * @inheritDoc
+         */
+        public static function build(): string
         {
+            $response = DebugPanelClass::$currentResponse;
             return self::buildAddCookieSection()
                  . self::buildRequestCookiesSection()
                  . self::buildResponseCookiesSection($response);
         }
 
-        private static function buildRequestCookiesSection(): string
+        /**
+         * Builds the request cookies section of the debug panel.
+         *
+         * @return string The HTML content for the request cookies section.
+         */
+        protected static function buildRequestCookiesSection(): string
         {
             $cookies = $_COOKIE;
 
             if (empty($cookies))
             {
-                return Shared::buildSection(
+                return self::buildSection(
                     'Request cookies (0)',
                     '<div style="padding:8px;font-style:italic;color:#999;text-align:center;">No cookies in current request</div>'
                 );
@@ -32,8 +43,8 @@
                 $jsName    = json_encode((string) $name,  JSON_HEX_QUOT | JSON_HEX_TAG);
                 $attrName  = htmlspecialchars((string) $name,  ENT_QUOTES, 'UTF-8');
                 $attrValue = htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-                $dispName  = Shared::escape((string) $name);
-                $dispValue = Shared::escape((string) $value);
+                $dispName  = self::escape((string) $name);
+                $dispValue = self::escape((string) $value);
 
                 // View row
                 $html .= '<div class="dw-param-item dw-cookie-view-row" id="' . $safeId . '-view">'
@@ -73,10 +84,16 @@
                        . '</div>';
             }
 
-            return Shared::buildSection('Request cookies (' . count($cookies) . ')', $html);
+            return self::buildSection('Request cookies (' . count($cookies) . ')', $html);
         }
 
-        private static function buildResponseCookiesSection(Response $response): string
+        /**
+         * Builds the response cookies section of the debug panel.
+         *
+         * @param Response $response The current response object to extract cookies from.
+         * @return string The HTML content for the response cookies section.
+         */
+        protected static function buildResponseCookiesSection(Response $response): string
         {
             $cookies = $response->getCookies();
 
@@ -91,25 +108,30 @@
                 $expires = $cookie->getExpires();
                 $attrs   = [];
                 $attrs[] = $expires === 0 ? 'session' : 'expires ' . date('Y-m-d H:i:s', $expires);
-                if ($cookie->getPath() !== '/')  $attrs[] = 'path: '   . Shared::escape($cookie->getPath());
-                if ($cookie->getDomain() !== '')  $attrs[] = 'domain: ' . Shared::escape($cookie->getDomain());
+                if ($cookie->getPath() !== '/')  $attrs[] = 'path: '   . self::escape($cookie->getPath());
+                if ($cookie->getDomain() !== '')  $attrs[] = 'domain: ' . self::escape($cookie->getDomain());
                 if ($cookie->isSecure())          $attrs[] = 'secure';
                 if ($cookie->isHttpOnly())        $attrs[] = 'httpOnly';
 
                 $html .= '<div class="dw-param-item">'
-                       . '<span class="dw-param-key">'   . Shared::escape($cookie->getName())  . '</span>'
-                       . '<span class="dw-param-value" style="flex:1;">' . Shared::escape($cookie->getValue()) . '</span>'
+                       . '<span class="dw-param-key">'   . self::escape($cookie->getName())  . '</span>'
+                       . '<span class="dw-param-value" style="flex:1;">' . self::escape($cookie->getValue()) . '</span>'
                        . '<span style="color:#888;font-size:10px;white-space:nowrap;padding-left:8px;">[' . implode(', ', $attrs) . ']</span>'
                        . '</div>';
             }
 
-            return Shared::buildSection(
+            return self::buildSection(
                 'Response cookies (' . count($cookies) . ') &mdash; <span style="font-weight:normal;color:#777;">pending, not yet sent</span>',
                 $html
             );
         }
 
-        private static function buildAddCookieSection(): string
+        /**
+         * Builds the "Add / update cookie" section of the debug panel, which includes a form for setting new cookies or updating existing ones.
+         *
+         * @return string The HTML content for the add/update cookie section.
+         */
+        protected static function buildAddCookieSection(): string
         {
             $content = '<div class="dw-ck-edit-form" style="border:none;">'
                      . '<div class="dw-ck-form-grid">'
@@ -138,23 +160,27 @@
                      . '</div>'
                      . '</div>';
 
-            return Shared::buildSection('Add / update cookie', $content);
+            return self::buildSection('Add / update cookie', $content);
         }
 
-        private static function field(
-            string $label,
-            string $id,
-            string $type,
-            string $value,
-            string $extraClass,
-            string $placeholder = ''
-        ): string
+        /**
+         * Helper method to build a form field with a label and input/select element.
+         *
+         * @param string $label The label text for the field.
+         * @param string $id The ID attribute for the input/select element.
+         * @param string $type The type of the input element (e.g. 'text', 'datetime-local') or 'select' for a dropdown.
+         * @param string $value The current value to populate the input/select with.
+         * @param string $extraClass Additional CSS classes to apply to the field container.
+         * @param string $placeholder Optional placeholder text for input fields.
+         * @return string The HTML content for the form field.
+         */
+        protected static function field(string $label, string $id, string $type, string $value, string $extraClass, string $placeholder=''): string
         {
             $attrVal  = htmlspecialchars($value,       ENT_QUOTES, 'UTF-8');
             $attrPh   = htmlspecialchars($placeholder, ENT_QUOTES, 'UTF-8');
             $disabled = ($type === 'datetime-local' && str_contains($id, 'expires')) ? ' disabled' : '';
             return '<div class="dw-ck-field' . ($extraClass ? ' ' . $extraClass : '') . '">'
-                 . '<label class="dw-ck-label" for="' . $id . '">' . Shared::escape($label) . '</label>'
+                 . '<label class="dw-ck-label" for="' . $id . '">' . self::escape($label) . '</label>'
                  . '<input type="' . $type . '" id="' . $id . '" class="dw-input" style="width:100%;"'
                  . ' value="' . $attrVal . '"'
                  . ($attrPh ? ' placeholder="' . $attrPh . '"' : '')
@@ -162,16 +188,26 @@
                  . '</div>';
         }
 
-        private static function select(string $label, string $id, array $options, string $selected, string $extraClass): string
+        /**
+         * Helper method to build a select dropdown field with a label.
+         *
+         * @param string $label The label text for the field.
+         * @param string $id The ID attribute for the select element.
+         * @param array $options An associative array of option values and display texts.
+         * @param string $selected The currently selected value.
+         * @param string $extraClass Additional CSS classes to apply to the field container.
+         * @return string The HTML content for the select field.
+         */
+        protected static function select(string $label, string $id, array $options, string $selected, string $extraClass): string
         {
             $opts = '';
             foreach ($options as $val => $text)
             {
                 $sel   = $val === $selected ? ' selected' : '';
-                $opts .= '<option value="' . Shared::escape($val) . '"' . $sel . '>' . Shared::escape($text) . '</option>';
+                $opts .= '<option value="' . self::escape($val) . '"' . $sel . '>' . self::escape($text) . '</option>';
             }
             return '<div class="dw-ck-field' . ($extraClass ? ' ' . $extraClass : '') . '">'
-                 . '<label class="dw-ck-label" for="' . $id . '">' . Shared::escape($label) . '</label>'
+                 . '<label class="dw-ck-label" for="' . $id . '">' . self::escape($label) . '</label>'
                  . '<select id="' . $id . '" class="dw-input" style="width:100%;">' . $opts . '</select>'
                  . '</div>';
         }

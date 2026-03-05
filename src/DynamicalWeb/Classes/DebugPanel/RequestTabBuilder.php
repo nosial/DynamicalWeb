@@ -2,26 +2,32 @@
 
     namespace DynamicalWeb\Classes\DebugPanel;
 
+    use DynamicalWeb\Abstract\AbstractTabBuilder;
+    use DynamicalWeb\Classes\DebugPanel as DebugPanelClass;
     use DynamicalWeb\Objects\Request;
     use DynamicalWeb\Objects\Response;
 
-    class RequestTabBuilder
+    class RequestTabBuilder extends AbstractTabBuilder
     {
-        public static function build(?Request $request): string
+        /**
+         * @inheritDoc
+         */
+        public static function build(): string
         {
+            $request = DebugPanelClass::$currentRequest;
             $meta = [];
-            $meta['Client IP'] = Shared::escape($_SERVER['REMOTE_ADDR'] ?? 'N/A');
+            $meta['Client IP'] = self::escape($_SERVER['REMOTE_ADDR'] ?? 'N/A');
             if (!empty($_SERVER['HTTP_X_FORWARDED_FOR']))
             {
-                $meta['Forwarded For'] = Shared::escape($_SERVER['HTTP_X_FORWARDED_FOR']);
+                $meta['Forwarded For'] = self::escape($_SERVER['HTTP_X_FORWARDED_FOR']);
             }
             if (!empty($_SERVER['HTTP_X_REAL_IP']))
             {
-                $meta['Real IP'] = Shared::escape($_SERVER['HTTP_X_REAL_IP']);
+                $meta['Real IP'] = self::escape($_SERVER['HTTP_X_REAL_IP']);
             }
-            $meta['Request Method'] = $request ? Shared::escape($request->getMethod()->value) : 'N/A';
-            $meta['Request URI'] = Shared::escape($_SERVER['REQUEST_URI'] ?? 'N/A');
-            $meta['HTTP Version'] = Shared::escape($_SERVER['SERVER_PROTOCOL'] ?? 'N/A');
+            $meta['Request Method'] = $request ? self::escape($request->getMethod()->value) : 'N/A';
+            $meta['Request URI'] = self::escape($_SERVER['REQUEST_URI'] ?? 'N/A');
+            $meta['HTTP Version'] = self::escape($_SERVER['SERVER_PROTOCOL'] ?? 'N/A');
             $httpsVal = $_SERVER['HTTPS'] ?? '';
             $meta['HTTPS'] = ($httpsVal === 'on' || $httpsVal === '1') ? 'Yes' : 'No';
             if (isset($_SERVER['REQUEST_TIME_FLOAT']))
@@ -32,19 +38,19 @@
             }
             if (!empty($_SERVER['HTTP_CONNECTION']))
             {
-                $meta['Connection'] = Shared::escape($_SERVER['HTTP_CONNECTION']);
+                $meta['Connection'] = self::escape($_SERVER['HTTP_CONNECTION']);
             }
             if (!empty($_SERVER['HTTP_KEEP_ALIVE']))
             {
-                $meta['Keep-Alive'] = Shared::escape($_SERVER['HTTP_KEEP_ALIVE']);
+                $meta['Keep-Alive'] = self::escape($_SERVER['HTTP_KEEP_ALIVE']);
             }
 
-            $html = Shared::buildSection('Connection & Request Metadata', Shared::buildParametersHtml($meta));
+            $html = self::buildSection('Connection & Request Metadata', self::buildParametersHtml($meta));
 
             $userAgentObj = $request ? $request->getUserAgent() : null;
             if ($userAgentObj !== null)
             {
-                $html .= Shared::buildSection('User Agent Detection', Shared::buildUserAgentHtml($userAgentObj));
+                $html .= self::buildSection('User Agent Detection', self::buildUserAgentHtml($userAgentObj));
             }
 
             if ($request !== null)
@@ -60,7 +66,7 @@
                 }
                 if (!empty($negotiation))
                 {
-                    $html .= Shared::buildSection('Content Negotiation', Shared::buildParametersHtml($negotiation));
+                    $html .= self::buildSection('Content Negotiation', self::buildParametersHtml($negotiation));
                 }
             }
 
@@ -76,13 +82,13 @@
                 if (!empty($data))
                 {
                     $count = count($data);
-                    $html .= Shared::buildSection("$label ($count)", Shared::buildParametersHtml($data));
+                    $html .= self::buildSection("$label ($count)", self::buildParametersHtml($data));
                 }
             }
 
             if ($request && $request->hasFiles())
             {
-                $html .= Shared::buildSection('Uploaded Files (' . $request->getFileCount() . ')', self::buildUploadsHtml($request->getFiles()));
+                $html .= self::buildSection('Uploaded Files (' . $request->getFileCount() . ')', self::buildUploadsHtml($request->getFiles()));
             }
 
             if ($request !== null)
@@ -93,9 +99,9 @@
                     $rawBody = $request->getRawBody();
                     if ($rawBody !== null && $rawBody !== '')
                     {
-                        $html .= Shared::buildSection(
-                            'Raw Request Body (' . Shared::formatBytes(strlen($rawBody)) . ')',
-                            Shared::buildRawBodyPreviewHtml($rawBody)
+                        $html .= self::buildSection(
+                            'Raw Request Body (' . self::formatBytes(strlen($rawBody)) . ')',
+                            self::buildRawBodyPreviewHtml($rawBody)
                         );
                     }
                 }
@@ -104,7 +110,13 @@
             return $html;
         }
 
-        public static function buildUploadsHtml(array $files): string
+        /**
+         * Builds the HTML for the uploaded files section of the debug panel.
+         *
+         * @param array $files The array of uploaded files, typically from $request->getFiles().
+         * @return string The HTML content for the uploaded files section, or a message if no files are present.
+         */
+        protected static function buildUploadsHtml(array $files): string
         {
             if (empty($files))
             {
@@ -148,11 +160,22 @@
             return $html ?: '<div style="padding:8px;font-style:italic;color:#999;text-align:center;">No files</div>';
         }
 
-        public static function buildUploadFileRow(string $name, string $type, int $size, bool $valid, int $error): string
+        /**
+         * Builds the HTML for a single uploaded file row in the debug panel.
+         *
+         * @param string $name The original name of the uploaded file.
+         * @param string $type The MIME type of the uploaded file.
+         * @param int $size The size of the uploaded file in bytes.
+         * @param bool $valid Whether the upload was successful (error code UPLOAD_ERR_OK).
+         * @param int $error The error code associated with the upload, if any.
+         *
+         * @return string The HTML content for a single uploaded file row, including validation status and error messages if applicable.
+         */
+        protected static function buildUploadFileRow(string $name, string $type, int $size, bool $valid, int $error): string
         {
             static $errorMessages = [
                 UPLOAD_ERR_INI_SIZE   => 'Exceeds upload_max_filesize',
-                UPLOAD_ERR_FORM_SIZE  => 'Exceeds MAX_FILE_SIZE directive',
+                UPLOAD_ERR_FORM_SIZE  => 'Exceeds ax file size directive',
                 UPLOAD_ERR_PARTIAL    => 'Only partially uploaded',
                 UPLOAD_ERR_NO_FILE    => 'No file was uploaded',
                 UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary folder',
@@ -165,11 +188,17 @@
             $errNote = $valid ? '' : ' &bull; ' . ($errorMessages[$error] ?? 'Error ' . $error);
 
             return '<div class="dw-param-item">'
-                 . '<span class="dw-param-key" style="color:' . $color . ';">' . $icon . ' ' . Shared::escape($name) . '</span>'
-                 . '<span class="dw-param-value">' . Shared::escape($type) . ' &bull; ' . Shared::formatBytes($size) . $errNote . '</span>'
+                 . '<span class="dw-param-key" style="color:' . $color . ';">' . $icon . ' ' . self::escape($name) . '</span>'
+                 . '<span class="dw-param-value">' . self::escape($type) . ' &bull; ' . self::formatBytes($size) . $errNote . '</span>'
                  . '</div>';
         }
 
+        /**
+         * Builds the HTML for the security audit section of the debug panel, checking for common security headers.
+         *
+         * @param Response $response The response object to check for security headers.
+         * @return string The HTML content for the security audit section, indicating which headers are present and their values if applicable.
+         */
         public static function buildSecurityAuditHtml(Response $response): string
         {
             $headers = array_change_key_case($response->getHeaders(), CASE_LOWER);
@@ -189,11 +218,11 @@
             {
                 $icon  = $present ? '&#10003; Present'  : '&#9651; Missing';
                 $color = $present ? '#27ae60'            : '#c47a00';
-                $value = $present ? Shared::escape($headers[strtolower($header)] ?? $headers['content-security-policy-report-only'] ?? '') : '';
+                $value = $present ? self::escape($headers[strtolower($header)] ?? $headers['content-security-policy-report-only'] ?? '') : '';
                 $html .= '<div class="dw-param-item">'
                        . '<span class="dw-param-key" style="color:' . $color . ';">' . $icon . '</span>'
                        . '<span class="dw-param-value">'
-                       . '<strong>' . Shared::escape($header) . '</strong>'
+                       . '<strong>' . self::escape($header) . '</strong>'
                        . ($value ? '<br><span style="color:#555;">' . $value . '</span>' : '')
                        . '</span>'
                        . '</div>';

@@ -2,14 +2,24 @@
 
     namespace DynamicalWeb\Classes\DebugPanel;
 
-    class OpcacheTabBuilder
+    use DynamicalWeb\Abstract\AbstractTabBuilder;
+
+    class OpcacheTabBuilder extends AbstractTabBuilder
     {
+        /**
+         * @inheritDoc
+         */
         public static function build(): string
         {
             return self::buildOpcacheStatsSection() . self::buildOpcacheConfigSection();
         }
 
-        public static function buildOpcacheStatsSection(): string
+        /**
+         * Builds the OPcache statistics section of the debug panel.
+         *
+         * @return string The HTML content for the OPcache statistics section.
+         */
+        protected static function buildOpcacheStatsSection(): string
         {
             if (!function_exists('opcache_get_status'))
             {
@@ -28,15 +38,15 @@
 
             if (!empty($mem))
             {
-                $data['Memory Used']   = Shared::formatBytes((int) ($mem['used_memory']  ?? 0));
-                $data['Memory Free']   = Shared::formatBytes((int) ($mem['free_memory']  ?? 0));
-                $data['Memory Wasted'] = Shared::formatBytes((int) ($mem['wasted_memory'] ?? 0))
+                $data['Memory Used']   = self::formatBytes((int) ($mem['used_memory']  ?? 0));
+                $data['Memory Free']   = self::formatBytes((int) ($mem['free_memory']  ?? 0));
+                $data['Memory Wasted'] = self::formatBytes((int) ($mem['wasted_memory'] ?? 0))
                                        . ' (' . round((float) ($mem['current_wasted_percentage'] ?? 0), 2) . '%)';
             }
 
             if (isset($ocs['interned_strings_usage']['used_memory']))
             {
-                $data['Interned Strings'] = Shared::formatBytes((int) $ocs['interned_strings_usage']['used_memory']);
+                $data['Interned Strings'] = self::formatBytes((int) $ocs['interned_strings_usage']['used_memory']);
             }
 
             if (!empty($stats))
@@ -52,23 +62,28 @@
                 $data['Last Restart Time'] = $lastRestart > 0 ? date('Y-m-d H:i:s', $lastRestart) : 'Never';
             }
 
-            $result = Shared::buildSection('OPcache Statistics', Shared::buildParametersHtml($data));
+            $result = self::buildSection('OPcache Statistics', self::buildParametersHtml($data));
 
             if (!empty($ocs['jit']))
             {
                 $jit    = $ocs['jit'];
-                $result .= Shared::buildSection('JIT Compiler', Shared::buildParametersHtml([
+                $result .= self::buildSection('JIT Compiler', self::buildParametersHtml([
                     'JIT Status'  => !empty($jit['enabled']) ? 'Enabled' : 'Disabled',
                     'JIT On'      => !empty($jit['on'])      ? 'Yes'     : 'No',
-                    'Buffer Size' => Shared::formatBytes((int) ($jit['buffer_size'] ?? 0)),
-                    'Buffer Free' => Shared::formatBytes((int) ($jit['buffer_free'] ?? 0)),
+                    'Buffer Size' => self::formatBytes((int) ($jit['buffer_size'] ?? 0)),
+                    'Buffer Free' => self::formatBytes((int) ($jit['buffer_free'] ?? 0)),
                 ]));
             }
 
             return $result;
         }
 
-        public static function buildOpcacheConfigSection(): string
+        /**
+         * Builds the OPcache configuration section of the debug panel.
+         *
+         * @return string The HTML content for the OPcache configuration section.
+         */
+        protected static function buildOpcacheConfigSection(): string
         {
             if (!function_exists('opcache_get_configuration'))
             {
@@ -97,8 +112,8 @@
                     continue;
                 }
                 $val = $cfg['directives'][$key];
-                $display = is_bool($val) ? ($val ? 'On' : 'Off') : Shared::escape((string) $val);
-                $data[Shared::escape($key)] = $display;
+                $display = is_bool($val) ? ($val ? 'On' : 'Off') : self::escape((string) $val);
+                $data[self::escape($key)] = $display;
             }
 
             if (empty($data))
@@ -106,9 +121,14 @@
                 return '';
             }
 
-            return Shared::buildSection('OPcache Configuration', Shared::buildParametersHtml($data));
+            return self::buildSection('OPcache Configuration', self::buildParametersHtml($data));
         }
 
+        /**
+         * Builds the Realpath Cache section of the debug panel.
+         *
+         * @return string The HTML content for the Realpath Cache section, or an empty string if not supported.
+         */
         public static function buildRealpathCacheSection(): string
         {
             $size  = function_exists('realpath_cache_size') ? realpath_cache_size() : null;
@@ -122,14 +142,19 @@
             }
 
             $data = [];
-            if ($size !== null)  $data['Used Size']   = Shared::formatBytes($size);
-            if ($max)            $data['Max Size']     = Shared::escape($max);
+            if ($size !== null)  $data['Used Size']   = self::formatBytes($size);
+            if ($max)            $data['Max Size']     = self::escape($max);
             if ($count !== null) $data['Cached Paths'] = (string) $count;
             if ($ttl)            $data['TTL']          = $ttl . 's';
 
-            return Shared::buildSection('Realpath Cache', Shared::buildParametersHtml($data));
+            return self::buildSection('Realpath Cache', self::buildParametersHtml($data));
         }
 
+        /**
+         * Builds the Garbage Collector section of the debug panel.
+         *
+         * @return string The HTML content for the Garbage Collector section, or an empty string if not supported.
+         */
         public static function buildGcStatusSection(): string
         {
             if (!function_exists('gc_status'))
@@ -147,6 +172,6 @@
                 'Threshold'        => (string) ($gc['threshold'] ?? 'N/A'),
             ];
 
-            return Shared::buildSection('PHP Garbage Collector', Shared::buildParametersHtml($data));
+            return self::buildSection('PHP Garbage Collector', self::buildParametersHtml($data));
         }
     }

@@ -2,12 +2,19 @@
 
     namespace DynamicalWeb\Classes\DebugPanel;
 
+    use DynamicalWeb\Abstract\AbstractTabBuilder;
+    use DynamicalWeb\Classes\DebugPanel as DebugPanelClass;
     use DynamicalWeb\WebSession;
+    use Throwable;
 
-    class SectionsTabBuilder
+    class SectionsTabBuilder extends AbstractTabBuilder
     {
-        public static function build(array $executedSections): string
+        /**
+         * @inheritDoc
+         */
+        public static function build(): string
         {
+            $executedSections = DebugPanelClass::$executedSections;
             try
             {
                 $instance = WebSession::getInstance();
@@ -26,11 +33,11 @@
                 foreach ($sections as $name => $section)
                 {
                     $localeId = $section->getLocaleId() ?? '—';
-                    $configuredData[Shared::escape($name)] = Shared::escape($section->getModule())
-                        . '<span style="color:#888;margin-left:8px;font-size:10px;">locale: ' . Shared::escape($localeId) . '</span>';
+                    $configuredData[self::escape($name)] = self::escape($section->getModule())
+                        . '<span style="color:#888;margin-left:8px;font-size:10px;">locale: ' . self::escape($localeId) . '</span>';
                 }
 
-                $html = Shared::buildSection('Configured Sections (' . count($sections) . ')', Shared::buildParametersHtml($configuredData));
+                $html = self::buildSection('Configured Sections (' . count($sections) . ')', self::buildParametersHtml($configuredData));
 
                 if (!empty($executedSections))
                 {
@@ -38,21 +45,21 @@
                     foreach ($executedSections as $name => $info)
                     {
                         $count    = $info['count'];
-                        $total    = Shared::formatTime($info['totalDuration']);
-                        $avg      = $count > 0 ? Shared::formatTime($info['totalDuration'] / $count) : '0ms';
-                        $executedData[Shared::escape($name)] =
+                        $total    = self::formatTime($info['totalDuration']);
+                        $avg      = $count > 0 ? self::formatTime($info['totalDuration'] / $count) : '0ms';
+                        $executedData[self::escape($name)] =
                             $count . 'x &nbsp; total: ' . $total . ' &nbsp; avg: ' . $avg;
                     }
-                    $html .= Shared::buildSection('Executed This Request (' . count($executedSections) . ')', Shared::buildParametersHtml($executedData));
+                    $html .= self::buildSection('Executed This Request (' . count($executedSections) . ')', self::buildParametersHtml($executedData));
                 }
                 else
                 {
-                    $html .= Shared::buildSection('Executed This Request', '<div style="padding:8px;font-style:italic;color:#999;text-align:center;">No sections were rendered during this request</div>');
+                    $html .= self::buildSection('Executed This Request', '<div style="padding:8px;font-style:italic;color:#999;text-align:center;">No sections were rendered during this request</div>');
                 }
 
                 return $html;
             }
-            catch (\Throwable)
+            catch (Throwable)
             {
                 return '';
             }

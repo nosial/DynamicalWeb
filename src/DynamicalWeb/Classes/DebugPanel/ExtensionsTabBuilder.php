@@ -2,10 +2,15 @@
 
     namespace DynamicalWeb\Classes\DebugPanel;
 
-    class ExtensionsTabBuilder
+    use DynamicalWeb\Abstract\AbstractTabBuilder;
+
+    class ExtensionsTabBuilder extends AbstractTabBuilder
     {
+        /**
+         * @inheritDoc
+         */
         public static function build(): string
         {
-            return Shared::buildSection('Loaded Extensions (' . count(get_loaded_extensions()) . ')', PhpTabBuilder::buildPhpExtensionsHtml());
+            return self::buildSection('Loaded Extensions (' . count(get_loaded_extensions()) . ')', PhpTabBuilder::buildPhpExtensionsHtml());
         }
     }

@@ -2,14 +2,19 @@
 
     namespace DynamicalWeb\Classes\DebugPanel;
 
-    class ServerTabBuilder
+    use DynamicalWeb\Abstract\AbstractTabBuilder;
+
+    class ServerTabBuilder extends AbstractTabBuilder
     {
+        /**
+         * @inheritDoc
+         */
         public static function build(): string
         {
             $envVars = [];
             foreach ($_ENV as $k => $v)
             {
-                $envVars[Shared::escape((string) $k)] = Shared::escape(is_array($v) ? json_encode($v) : (string) $v);
+                $envVars[self::escape((string) $k)] = self::escape(is_array($v) ? json_encode($v) : (string) $v);
             }
 
             $uptime = 'N/A';
@@ -42,25 +47,25 @@
             }
 
             $html =
-                Shared::buildSection('Server Environment', Shared::buildParametersHtml([
-                    'Hostname'          => Shared::escape(gethostname() ?: 'N/A'),
-                    'Server Software'   => Shared::escape($_SERVER['SERVER_SOFTWARE']   ?? 'N/A'),
-                    'Server Name'       => Shared::escape($_SERVER['SERVER_NAME']       ?? 'N/A'),
-                    'Server Port'       => Shared::escape($_SERVER['SERVER_PORT']       ?? 'N/A'),
-                    'Server Admin'      => Shared::escape($_SERVER['SERVER_ADMIN']      ?? 'N/A'),
-                    'Server Signature'  => Shared::escape($_SERVER['SERVER_SIGNATURE']  ?? 'N/A'),
-                    'Protocol'          => Shared::escape($_SERVER['SERVER_PROTOCOL']   ?? 'N/A'),
-                    'Document Root'     => Shared::escape($_SERVER['DOCUMENT_ROOT']     ?? 'N/A'),
-                    'Script Filename'   => Shared::escape($_SERVER['SCRIPT_FILENAME']   ?? 'N/A'),
-                    'Script Name'       => Shared::escape($_SERVER['SCRIPT_NAME']       ?? 'N/A'),
-                    'Gateway Interface' => Shared::escape($_SERVER['GATEWAY_INTERFACE'] ?? 'N/A'),
-                    'OS'                => Shared::escape(PHP_OS),
+                self::buildSection('Server Environment', self::buildParametersHtml([
+                    'Hostname'          => self::escape(gethostname() ?: 'N/A'),
+                    'Server Software'   => self::escape($_SERVER['SERVER_SOFTWARE']   ?? 'N/A'),
+                    'Server Name'       => self::escape($_SERVER['SERVER_NAME']       ?? 'N/A'),
+                    'Server Port'       => self::escape($_SERVER['SERVER_PORT']       ?? 'N/A'),
+                    'Server Admin'      => self::escape($_SERVER['SERVER_ADMIN']      ?? 'N/A'),
+                    'Server Signature'  => self::escape($_SERVER['SERVER_SIGNATURE']  ?? 'N/A'),
+                    'Protocol'          => self::escape($_SERVER['SERVER_PROTOCOL']   ?? 'N/A'),
+                    'Document Root'     => self::escape($_SERVER['DOCUMENT_ROOT']     ?? 'N/A'),
+                    'Script Filename'   => self::escape($_SERVER['SCRIPT_FILENAME']   ?? 'N/A'),
+                    'Script Name'       => self::escape($_SERVER['SCRIPT_NAME']       ?? 'N/A'),
+                    'Gateway Interface' => self::escape($_SERVER['GATEWAY_INTERFACE'] ?? 'N/A'),
+                    'OS'                => self::escape(PHP_OS),
                     'Architecture'      => PHP_INT_SIZE === 8 ? '64-bit' : '32-bit',
                     'CPU Cores'         => $cpuCores,
                     'System Uptime'     => $uptime,
                     'PHP Process PID'   => (string) getmypid(),
                 ])) .
-                (!empty($envVars) ? Shared::buildSection('Environment Variables (' . count($envVars) . ')', Shared::buildParametersHtml($envVars)) : '') .
+                (!empty($envVars) ? self::buildSection('Environment Variables (' . count($envVars) . ')', self::buildParametersHtml($envVars)) : '') .
                 self::buildServerVarsSection();
 
             if (is_readable('/proc/meminfo'))
@@ -82,16 +87,16 @@
                     {
                         if (isset($memInfo[$key]))
                         {
-                            $memData[$key] = Shared::formatBytes($memInfo[$key] * 1024);
+                            $memData[$key] = self::formatBytes($memInfo[$key] * 1024);
                         }
                     }
                     if (isset($memInfo['MemTotal'], $memInfo['MemAvailable']))
                     {
-                        $memData['Used'] = Shared::formatBytes(($memInfo['MemTotal'] - $memInfo['MemAvailable']) * 1024);
+                        $memData['Used'] = self::formatBytes(($memInfo['MemTotal'] - $memInfo['MemAvailable']) * 1024);
                     }
                     if (!empty($memData))
                     {
-                        $html .= Shared::buildSection('System Memory', Shared::buildParametersHtml($memData));
+                        $html .= self::buildSection('System Memory', self::buildParametersHtml($memData));
                     }
                 }
             }
@@ -104,7 +109,7 @@
                     $parts = explode(' ', trim($raw));
                     if (count($parts) >= 5)
                     {
-                        $html .= Shared::buildSection('System Load Average', Shared::buildParametersHtml([
+                        $html .= self::buildSection('System Load Average', self::buildParametersHtml([
                             '1 min'         => $parts[0],
                             '5 min'         => $parts[1],
                             '15 min'        => $parts[2],
@@ -124,10 +129,10 @@
                 {
                     $used    = $total - $free;
                     $usedPct = round($used / $total * 100, 1);
-                    $html   .= Shared::buildSection('Disk Usage', Shared::buildParametersHtml([
-                        'Total'  => Shared::formatBytes((int) $total),
-                        'Free'   => Shared::formatBytes((int) $free),
-                        'Used'   => Shared::formatBytes((int) $used),
+                    $html   .= self::buildSection('Disk Usage', self::buildParametersHtml([
+                        'Total'  => self::formatBytes((int) $total),
+                        'Free'   => self::formatBytes((int) $free),
+                        'Used'   => self::formatBytes((int) $used),
                         'Used %' => $usedPct . '%',
                     ]));
                 }
@@ -136,7 +141,7 @@
             return $html;
         }
 
-        public static function buildServerVarsSection(): string
+        protected static function buildServerVarsSection(): string
         {
             $alreadyShown = [
                 'SERVER_SOFTWARE', 'SERVER_NAME', 'SERVER_ADMIN', 'SERVER_SIGNATURE',
@@ -172,7 +177,7 @@
                     continue;
                 }
 
-                $data[Shared::escape((string) $k)] = Shared::escape($display);
+                $data[self::escape((string) $k)] = self::escape($display);
             }
 
             if (empty($data))
@@ -181,6 +186,6 @@
             }
 
             ksort($data);
-            return Shared::buildSection('$_SERVER (' . count($data) . ')', Shared::buildParametersHtml($data));
+            return self::buildSection('$_SERVER (' . count($data) . ')', self::buildParametersHtml($data));
         }
     }

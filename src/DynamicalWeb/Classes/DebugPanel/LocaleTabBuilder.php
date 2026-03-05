@@ -2,11 +2,16 @@
 
     namespace DynamicalWeb\Classes\DebugPanel;
 
+    use DynamicalWeb\Abstract\AbstractTabBuilder;
     use DynamicalWeb\Objects\Request;
     use DynamicalWeb\WebSession;
+    use Throwable;
 
-    class LocaleTabBuilder
+    class LocaleTabBuilder extends AbstractTabBuilder
     {
+        /**
+         * @inheritDoc
+         */
         public static function build(): string
         {
             try
@@ -25,23 +30,30 @@
                     $data  = $locale->getLocaleData($id);
                     $count = $data ? count($data) : 0;
                     $totalStrings += $count;
-                    $idRows[Shared::escape($id)] = $count . ' string' . ($count !== 1 ? 's' : '');
+                    $idRows[self::escape($id)] = $count . ' string' . ($count !== 1 ? 's' : '');
                 }
 
                 return
-                    Shared::buildSection('Locale Info', Shared::buildParametersHtml([
-                        'Locale Code'    => Shared::escape($locale->getLocaleCode()),
+                    self::buildSection('Locale Info', self::buildParametersHtml([
+                        'Locale Code'    => self::escape($locale->getLocaleCode()),
                         'Locale IDs'     => (string) count($localeIds),
                         'Total Strings'  => (string) $totalStrings,
                     ])) .
-                    (!empty($idRows) ? Shared::buildSection('Locale IDs (' . count($idRows) . ')', Shared::buildParametersHtml($idRows)) : '');
+                    (!empty($idRows) ? self::buildSection('Locale IDs (' . count($idRows) . ')', self::buildParametersHtml($idRows)) : '');
             }
-            catch (\Throwable)
+            catch (Throwable)
             {
                 return '';
             }
         }
 
+        /**
+         * Builds the HTML for the locale switcher.
+         *
+         * @param Request|null $request The current request, used to determine the return path after switching locales.
+         *
+         * @return string The HTML for the locale switcher, or an empty string if it cannot be built.
+         */
         public static function buildLocaleSwitcherHtml(?Request $request): string
         {
             try
@@ -81,8 +93,8 @@
                 foreach ($availableLocales as $code)
                 {
                     $isCurrent = $code === $currentLocale;
-                    $url       = Shared::escape($basePath . '/dynaweb/language/' . rawurlencode($code) . '?r=' . $returnPath);
-                    $label     = Shared::escape(strtoupper($code));
+                    $url       = self::escape($basePath . '/dynaweb/language/' . rawurlencode($code) . '?r=' . $returnPath);
+                    $label     = self::escape(strtoupper($code));
 
                     if ($isCurrent)
                     {
@@ -111,7 +123,7 @@
                 $html .= '</div></div>';
                 return $html;
             }
-            catch (\Throwable)
+            catch (Throwable)
             {
                 return '';
             }

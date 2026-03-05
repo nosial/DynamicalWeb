@@ -2,12 +2,18 @@
 
     namespace DynamicalWeb\Classes\DebugPanel;
 
+    use DynamicalWeb\Abstract\AbstractTabBuilder;
+    use DynamicalWeb\Classes\DebugPanel as DebugPanelClass;
     use DynamicalWeb\Objects\Response;
 
-    class ResponseTabBuilder
+    class ResponseTabBuilder extends AbstractTabBuilder
     {
-        public static function build(Response $response): string
+        /**
+         * @inheritDoc
+         */
+        public static function build(): string
         {
+            $response = DebugPanelClass::$currentResponse;
             $code        = $response->getStatusCode();
             $statusColor = match(true) {
                 $code->value >= 500 => '#c0392b',
@@ -17,13 +23,13 @@
                 default             => '#666',
             };
             $statusHtml = '<div class="dw-param-item"><span class="dw-param-key" style="color:' . $statusColor . ';">HTTP ' . $code->value . '</span>'
-                        . '<span class="dw-param-value">' . Shared::escape(str_replace('_', ' ', $code->name)) . '</span></div>';
-            $html = Shared::buildSection('Response Status', $statusHtml);
+                        . '<span class="dw-param-value">' . self::escape(str_replace('_', ' ', $code->name)) . '</span></div>';
+            $html = self::buildSection('Response Status', $statusHtml);
 
             $headers = $response->getHeaders();
             if (!empty($headers))
             {
-                $html .= Shared::buildSection('Response Headers (' . count($headers) . ')', Shared::buildParametersHtml($headers));
+                $html .= self::buildSection('Response Headers (' . count($headers) . ')', self::buildParametersHtml($headers));
             }
 
             $cookies = $response->getCookies();
@@ -56,10 +62,10 @@
                     }
                     $cookieMap[$cookie->getName()] = implode(' | ', $parts);
                 }
-                $html .= Shared::buildSection('Response Cookies (' . count($cookies) . ')', Shared::buildParametersHtml($cookieMap));
+                $html .= self::buildSection('Response Cookies (' . count($cookies) . ')', self::buildParametersHtml($cookieMap));
             }
 
-            $html .= Shared::buildSection('Security Headers', RequestTabBuilder::buildSecurityAuditHtml($response));
+            $html .= self::buildSection('Security Headers', RequestTabBuilder::buildSecurityAuditHtml($response));
 
             $corsKeys     = ['access-control-allow-origin', 'access-control-allow-methods', 'access-control-allow-headers',
                              'access-control-allow-credentials', 'access-control-expose-headers', 'access-control-max-age'];
@@ -74,7 +80,7 @@
             }
             if (!empty($corsData))
             {
-                $html .= Shared::buildSection('CORS Headers', Shared::buildParametersHtml($corsData));
+                $html .= self::buildSection('CORS Headers', self::buildParametersHtml($corsData));
             }
 
             return $html;

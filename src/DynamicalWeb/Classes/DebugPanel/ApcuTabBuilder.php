@@ -2,10 +2,14 @@
 
     namespace DynamicalWeb\Classes\DebugPanel;
 
+    use DynamicalWeb\Abstract\AbstractTabBuilder;
     use DynamicalWeb\Classes\Apcu;
 
-    class ApcuTabBuilder
+    class ApcuTabBuilder extends AbstractTabBuilder
     {
+        /**
+         * @inheritDoc
+         */
         public static function build(): string
         {
             if (!Apcu::isExtensionAvailable())
@@ -23,7 +27,7 @@
                 $total   = $hits + $misses;
                 $hitRate = $total > 0 ? round($hits / $total * 100, 1) . '%' : 'N/A';
 
-                $html .= Shared::buildSection('APCu Cache Stats', Shared::buildParametersHtml([
+                $html .= self::buildSection('APCu Cache Stats', self::buildParametersHtml([
                     'Cache Status'    => 'Enabled',
                     'Entries'         => (string) ($info['num_entries']    ?? 0),
                     'Hits'            => number_format($hits),
@@ -31,7 +35,7 @@
                     'Hit Rate'        => $hitRate,
                     'Expunges'        => (string) ($info['expunges']       ?? 0),
                     'Start Time'      => isset($info['start_time']) ? date('Y-m-d H:i:s', (int) $info['start_time']) : 'N/A',
-                    'Memory Used'     => Shared::formatBytes((int) ($info['mem_size'] ?? 0)),
+                    'Memory Used'     => self::formatBytes((int) ($info['mem_size'] ?? 0)),
                 ]));
             }
 
@@ -43,12 +47,12 @@
                 $used    = $total - $avail;
                 $usedPct = $total > 0 ? round($used / $total * 100, 1) . '%' : 'N/A';
 
-                $html .= Shared::buildSection('APCu Shared Memory', Shared::buildParametersHtml([
+                $html .= self::buildSection('APCu Shared Memory', self::buildParametersHtml([
                     'Segments'        => (string) ($sma['num_seg'] ?? 'N/A'),
-                    'Segment Size'    => isset($sma['seg_size']) ? Shared::formatBytes((int) $sma['seg_size']) : 'N/A',
-                    'Total Memory'    => Shared::formatBytes($total),
-                    'Available'       => Shared::formatBytes($avail),
-                    'Used'            => Shared::formatBytes($used) . ' (' . $usedPct . ')',
+                    'Segment Size'    => isset($sma['seg_size']) ? self::formatBytes((int) $sma['seg_size']) : 'N/A',
+                    'Total Memory'    => self::formatBytes($total),
+                    'Available'       => self::formatBytes($avail),
+                    'Used'            => self::formatBytes($used) . ' (' . $usedPct . ')',
                 ]));
             }
 

@@ -2,13 +2,20 @@
 
     namespace DynamicalWeb\Classes\DebugPanel;
 
+    use DynamicalWeb\Abstract\AbstractTabBuilder;
+    use DynamicalWeb\Classes\DebugPanel as DebugPanelClass;
     use DynamicalWeb\Objects\WebConfiguration\Route;
     use DynamicalWeb\WebSession;
+    use Throwable;
 
-    class RoutesTabBuilder
+    class RoutesTabBuilder extends AbstractTabBuilder
     {
-        public static function build(?Route $currentRoute): string
+        /**
+         * @inheritDoc
+         */
+        public static function build(): string
         {
+            $currentRoute = DebugPanelClass::$currentRoute;
             try
             {
                 $instance = WebSession::getInstance();
@@ -42,23 +49,23 @@
                     foreach ($methods as $m)
                     {
                         $cssClass = strtolower($m) === '*' ? 'any' : strtolower($m);
-                        $methodBadges .= '<span class="dw-route-method dw-route-method-' . $cssClass . '">' . Shared::escape($m) . '</span>';
+                        $methodBadges .= '<span class="dw-route-method dw-route-method-' . $cssClass . '">' . self::escape($m) . '</span>';
                     }
 
-                    $locale     = $r->getLocaleId() ? ' <span class="dw-route-locale">' . Shared::escape($r->getLocaleId()) . '</span>' : '';
+                    $locale     = $r->getLocaleId() ? ' <span class="dw-route-locale">' . self::escape($r->getLocaleId()) . '</span>' : '';
                     $fullModule = $webRootPath . '/' . ltrim($r->getModule(), '/');
 
                     $html .= '<div class="' . $rowClass . '">'
-                           . '<span class="dw-route-col-path">' . Shared::escape($r->getPath()) . $locale . '</span>'
+                           . '<span class="dw-route-col-path">' . self::escape($r->getPath()) . $locale . '</span>'
                            . '<span class="dw-route-col-methods">' . $methodBadges . '</span>'
-                           . '<span class="dw-route-col-module">' . Shared::escape($fullModule) . '</span>'
+                           . '<span class="dw-route-col-module">' . self::escape($fullModule) . '</span>'
                            . '</div>';
                 }
 
                 $html .= '</div>';
                 return $html;
             }
-            catch (\Throwable)
+            catch (Throwable)
             {
                 return '';
             }
