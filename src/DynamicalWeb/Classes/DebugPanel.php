@@ -2,7 +2,6 @@
 
     namespace DynamicalWeb\Classes;
 
-    use DynamicalWeb\Classes\Apcu;
     use DynamicalWeb\Classes\DebugPanel\ApcuTabBuilder;
     use DynamicalWeb\Classes\DebugPanel\AppTabBuilder;
     use DynamicalWeb\Classes\DebugPanel\CookiesTabBuilder;
@@ -24,13 +23,17 @@
     use DynamicalWeb\Objects\Response;
     use DynamicalWeb\Objects\WebConfiguration\Route;
     use DynamicalWeb\WebSession;
+    use Throwable;
 
     class DebugPanel
     {
         public static float $startTime;
         public static float $startMemory;
-        private static array $executedFiles = [];
-        private static array $executedSections = [];
+        public static array $executedFiles = [];
+        public static array $executedSections = [];
+        public static ?Request $currentRequest = null;
+        public static ?Response $currentResponse = null;
+        public static ?Route $currentRoute = null;
 
         /**
          * Starts the debug recording process
@@ -39,10 +42,13 @@
          */
         public static function start(): void
         {
-            self::$startTime      = microtime(true);
-            self::$startMemory    = memory_get_usage(true);
+            self::$startTime        = microtime(true);
+            self::$startMemory      = memory_get_usage(true);
             self::$executedFiles    = [];
             self::$executedSections = [];
+            self::$currentRequest   = null;
+            self::$currentResponse  = null;
+            self::$currentRoute     = null;
         }
 
         /**
@@ -81,6 +87,14 @@
             self::$executedSections[$name]['totalDuration'] += $duration;
         }
 
+        /**
+         * Injects the debug panel HTML into the response body if conditions are met
+         *
+         * @param Response $response The HTTP response object to modify
+         * @param Request|null $request The current HTTP request object, if available
+         * @param Route|null $route The matched route for the current request, if available
+         * @return void
+         */
         public static function inject(Response $response, ?Request $request, ?Route $route): void
         {
             if (!isset(self::$startTime) || !isset(self::$startMemory))
@@ -104,8 +118,20 @@
             $response->setBody(str_replace('</body>', $panelHtml . '</body>', $body));
         }
 
+        /**
+         * Generates the HTML content for the debug panel iframe, collecting all necessary metrics and information
+         *
+         * @param Request|null $request The current HTTP request object, if available
+         * @param Response $response The current HTTP response object
+         * @param Route|null $route The matched route for the current request, if available
+         * @return string The HTML content for the debug panel iframe
+         */
         private static function generatePanel(?Request $request, Response $response, ?Route $route): string
         {
+            self::$currentRequest  = $request;
+            self::$currentResponse = $response;
+            self::$currentRoute    = $route;
+
             $includedFiles = get_included_files();
 
             $iframeVars = array_merge(
@@ -114,9 +140,9 @@
                 self::collectRouteInfo($route),
                 self::collectResponseMetrics($response),
                 [
-                    'requestSectionsHtml'    => RequestTabBuilder::build($request),
-                    'responseSectionsHtml'   => ResponseTabBuilder::build($response),
-                    'cookiesSectionsHtml'    => CookiesTabBuilder::build($response),
+                    'requestSectionsHtml'    => RequestTabBuilder::build(),
+                    'responseSectionsHtml'   => ResponseTabBuilder::build(),
+                    'cookiesSectionsHtml'    => CookiesTabBuilder::build(),
                     'cookieCount'            => count($_COOKIE),
                     'appSectionsHtml'        => AppTabBuilder::build(),
                     'phpSectionsHtml'        => PhpTabBuilder::build(),
@@ -126,9 +152,9 @@
                     'constantsSectionsHtml'  => ConstantsTabBuilder::build(),
                     'sessionSectionsHtml'    => SessionTabBuilder::build(),
                     'sessionCount'           => session_status() === PHP_SESSION_ACTIVE ? count($_SESSION) : -1,
-                    'routesSectionsHtml'     => RoutesTabBuilder::build($route),
+                    'routesSectionsHtml'     => RoutesTabBuilder::build(),
                     'routeCount'             => self::getRouteCount(),
-                    'sectionsSectionsHtml'   => SectionsTabBuilder::build(self::$executedSections),
+                    'sectionsSectionsHtml'   => SectionsTabBuilder::build(),
                     'sectionsCount'          => self::getSectionCount(),
                     'iniSectionsHtml'        => IniTabBuilder::build(),
                     'apcuSectionsHtml'       => ApcuTabBuilder::build(),
@@ -138,7 +164,7 @@
                     'localeSwitcherHtml'     => LocaleTabBuilder::buildLocaleSwitcherHtml($request),
                     'errorLogHtml'           => self::buildErrorLogHtml(),
                     'hasErrorLog'            => self::hasErrorLogAccess(),
-                    'executedFilesHtml'      => ProfilerTabBuilder::build(self::$executedFiles),
+                    'executedFilesHtml'      => ProfilerTabBuilder::build(),
                     'phpIncludedFilesHtml'   => ProfilerTabBuilder::buildIncluded($includedFiles),
                     'phpIncludedCount'       => count($includedFiles),
                     'responseBodySize'       => self::formatBytes(strlen($response->getBody())),
@@ -153,6 +179,11 @@
             );
         }
 
+        /**
+         * Collects performance metrics such as execution time, memory usage, and CPU time
+         *
+         * @return array An associative array containing formatted metrics for display in the debug panel
+         */
         private static function collectMetrics(): array
         {
             $executionTime = microtime(true) - self::$startTime;
@@ -193,20 +224,29 @@
             ];
         }
 
+        /**
+         * Collects detailed information about the HTTP request, such as method, path, headers, and client info
+         *
+         * @param Request|null $request The current HTTP request object, if available
+         * @return array An associative array containing request metrics for display in the debug panel
+         */
         private static function collectRequestMetrics(?Request $request): array
         {
             // Build the debug API base URL so the iframe can poll the stats endpoint
             $debugStatsUrl = '';
+
             if ($request)
             {
                 $scheme   = $request->isSecure() ? 'https' : 'http';
                 $basePath = '';
                 $instance = WebSession::getInstance();
+
                 if ($instance !== null)
                 {
                     $bp = $instance->getWebConfiguration()->getRouter()->getBasePath();
                     $basePath = rtrim($bp, '/');
                 }
+
                 $debugStatsUrl = $scheme . '://' . $request->getHost() . $basePath . '/dynaweb/debug/stats';
             }
 
@@ -231,9 +271,16 @@
             ];
         }
 
+        /**
+         * Collects information about the matched route for the current request, such as path, module, locale, and allowed methods
+         *
+         * @param Route|null $route The matched route for the current request, if available
+         * @return array An associative array containing route information for display in the debug panel
+         */
         private static function collectRouteInfo(?Route $route): array
         {
             $routeAllowedMethods = 'N/A';
+
             if ($route)
             {
                 $methods = array_map(static fn($m) => is_string($m) ? $m : $m->value, $route->getAllowedMethods());
@@ -248,14 +295,18 @@
             ];
         }
 
+        /**
+         * Collects information about the HTTP response, such as status code, content type, charset, and headers count
+         *
+         * @param Response $response The HTTP response object
+         * @return array An associative array containing response metrics for display in the debug panel
+         */
         private static function collectResponseMetrics(Response $response): array
         {
-            $statusCode = $response->getStatusCode()->value;
-
             return [
-                'statusCode'          => $statusCode,
+                'statusCode'          => $response->getStatusCode()->value,
                 'statusText'          => self::escape($response->getStatusCode()->getMessage()),
-                'statusClass'         => self::getStatusClass($statusCode),
+                'statusClass'         => self::getStatusClass($response->getStatusCode()->value),
                 'escapedContentType'  => self::escape($response->getContentType()),
                 'escapedCharset'      => self::escape($response->getCharset()),
                 'escapedPhpVersion'   => self::escape(PHP_VERSION),
@@ -265,6 +316,12 @@
             ];
         }
 
+        /**
+         * Returns the count of rendered sections during this request, safely handling any potential exceptions if the
+         * WebSession or its sections are not available
+         *
+         * @return int The count of rendered sections, or 0 if not available
+         */
         private static function getSectionCount(): int
         {
             try
@@ -272,17 +329,28 @@
                 $instance = WebSession::getInstance();
                 return $instance ? count($instance->getSections()) : 0;
             }
-            catch (\Throwable)
+            catch (Throwable)
             {
                 return 0;
             }
         }
+
+        /**
+         * Checks if the error log file is configured and accessible for reading, which allows the debug panel to display recent errors
+         *
+         * @return bool True if the error log file is set and readable, false otherwise
+         */
         private static function hasErrorLogAccess(): bool
         {
             $path = ini_get('error_log');
             return $path && file_exists($path) && is_readable($path);
         }
 
+        /**
+         * Builds the HTML content for the "Error Log" tab in the debug panel by reading the last 60 lines of the configured error log file
+         *
+         * @return string The HTML content representing the recent error log entries, or a message if the log is empty or inaccessible
+         */
         private static function buildErrorLogHtml(): string
         {
             $path = ini_get('error_log');
@@ -358,6 +426,12 @@
             return $html;
         }
 
+        /**
+         * Returns the count of defined routes in the web configuration, safely handling any potential exceptions if the
+         * WebSession or its router are not available
+         *
+         * @return int The count of defined routes, or 0 if not available
+         */
         private static function getRouteCount(): int
         {
             try
@@ -365,16 +439,30 @@
                 $instance = WebSession::getInstance();
                 return $instance ? count($instance->getWebConfiguration()->getRouter()->getRoutes()) : 0;
             }
-            catch (\Throwable)
+            catch (Throwable)
             {
                 return 0;
             }
         }
+
+        /**
+         * Generates the HTML content for the debug panel iframe by rendering the appropriate template with the collected variables
+         *
+         * @param array $vars An associative array of variables to pass to the template for rendering
+         * @return string The rendered HTML content for the debug panel iframe
+         */
         private static function generateIframeContent(array $vars): string
         {
             return self::renderTemplate(PathResolver::buildNccPath(PathConstants::DYNAMICAL_WEB->value, PathConstants::DYNAMICAL_PAGES->value, 'debug.phtml'), $vars);
         }
 
+        /**
+         * Renders a PHP template file with the given variables and returns the output as a string
+         *
+         * @param string $path The full path to the template file to render
+         * @param array $vars An associative array of variables to extract and make available in the template scope
+         * @return string The rendered content of the template
+         */
         private static function renderTemplate(string $path, array $vars): string
         {
             $render = static function(string $templatePath, array $templateVars): string
@@ -388,10 +476,12 @@
             return $render($path, $vars);
         }
 
-        // -------------------------------------------------------------------------
-        // Formatters & utilities
-        // -------------------------------------------------------------------------
-
+        /**
+         * Formats a time duration in seconds into a human-readable string with appropriate units (μs, ms, s)
+         *
+         * @param float $seconds The time duration in seconds
+         * @return string The formatted time string with units
+         */
         private static function formatTime(float $seconds): string
         {
             if ($seconds < 0.001)
@@ -407,6 +497,12 @@
             return number_format($seconds, 3) . ' s';
         }
 
+        /**
+         * Formats a byte count into a human-readable string with appropriate units (B, KB, MB, GB, TB)
+         *
+         * @param int $bytes The number of bytes
+         * @return string The formatted byte size string with units
+         */
         private static function formatBytes(int $bytes): string
         {
             $units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -416,13 +512,26 @@
             return round($bytes / (1 << (10 * $pow)), 2) . ' ' . $units[$pow];
         }
 
+        /**
+         * Determines the CSS class for the response status code to visually indicate success, warning, or error
+         *
+         * @param int $statusCode The HTTP status code of the response
+         * @return string The CSS class name corresponding to the status code category
+         */
         private static function getStatusClass(int $statusCode): string
         {
             if ($statusCode >= 200 && $statusCode < 300) return 'dw-status-success';
             if ($statusCode >= 300 && $statusCode < 400) return 'dw-status-warning';
+
             return 'dw-status-error';
         }
 
+        /**
+         * Escapes a string for safe output in HTML contexts to prevent XSS vulnerabilities
+         *
+         * @param string $str The input string to escape
+         * @return string The escaped string safe for HTML output
+         */
         private static function escape(string $str): string
         {
             return htmlspecialchars($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
