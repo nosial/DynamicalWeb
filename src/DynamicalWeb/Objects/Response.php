@@ -26,6 +26,7 @@
          * @var callable|null
          */
         private $streamCallback;
+        private bool $completed;
 
         /**
          * Response constructor.
@@ -43,6 +44,31 @@
             $this->responseType = ResponseType::BASIC;
             $this->filePath = null;
             $this->streamCallback = null;
+            $this->completed = false;
+        }
+
+        /**
+         * Returns whether the response has been marked as completed, indicating that no further
+         * processing (such as module execution) should occur.
+         *
+         * @return bool True if the response is completed, false otherwise.
+         */
+        public function isCompleted(): bool
+        {
+            return $this->completed;
+        }
+
+        /**
+         * Marks the response as completed, signalling that the request pipeline should skip
+         * any remaining pre-request scripts and module execution. Typically called from
+         * pre-request scripts that have fully handled the response (e.g. authentication failures).
+         *
+         * @return self Returns the Response object for method chaining.
+         */
+        public function setCompleted(): self
+        {
+            $this->completed = true;
+            return $this;
         }
 
         /**
