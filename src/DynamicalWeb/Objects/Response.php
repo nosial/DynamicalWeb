@@ -5,7 +5,6 @@
     use DynamicalWeb\Enums\MimeType;
     use DynamicalWeb\Enums\ResponseCode;
     use DynamicalWeb\Enums\ResponseType;
-    use DynamicalWeb\WebSession;
     use InvalidArgumentException;
     use Symfony\Component\Yaml\Yaml;
 
@@ -69,7 +68,7 @@
                 $statusCode = ResponseCode::tryFrom($statusCode);
                 if($statusCode === null)
                 {
-                    throw new InvalidArgumentException("Invalid status code: {$statusCode}");
+                    throw new InvalidArgumentException("Invalid status code: $statusCode");
                 }
             }
 
@@ -134,6 +133,10 @@
          */
         public function setHeader(string $name, string $value, bool $replace=true): self
         {
+            // Prevent CRLF / header injection
+            $name = str_replace(["\r", "\n", "\0"], '', $name);
+            $value = str_replace(["\r", "\n", "\0"], '', $value);
+
             if ($replace)
             {
                 $this->headers[$name] = $value;
@@ -215,7 +218,7 @@
                 $contentType = $contentType->value;
             }
 
-            $this->contentType = $contentType;
+            $this->contentType = str_replace(["\r", "\n", "\0"], '', $contentType);
             return $this;
         }
 
@@ -237,7 +240,7 @@
          */
         public function setCharset(string $charset): self
         {
-            $this->charset = $charset;
+            $this->charset = str_replace(["\r", "\n", "\0"], '', $charset);
             return $this;
         }
 
@@ -360,7 +363,7 @@
          * @return callable|null The stream callback for the response if the response type is STREAM, or null if no
          *                       stream callback is set or if the response type is not STREAM.
          */
-        public function getStreamCallback()
+        public function getStreamCallback(): ?callable
         {
             return $this->streamCallback;
         }
@@ -413,7 +416,7 @@
         {
             if (!file_exists($filePath))
             {
-                throw new InvalidArgumentException("File not found: {$filePath}");
+                throw new InvalidArgumentException("File not found: $filePath");
             }
 
             $this->responseType = ResponseType::FILE_DOWNLOAD;
@@ -423,6 +426,9 @@
             {
                 $filename = basename($filePath);
             }
+
+            // Sanitize filename to prevent header injection
+            $filename = str_replace(["\r", "\n", "\0", '"'], '', $filename);
 
             $this->setHeader('Content-Disposition', 'attachment; filename="' . $filename . '"');
             $this->setHeader('Content-Length', (string)filesize($filePath));
@@ -506,15 +512,14 @@
             // Set cookies
             foreach ($this->cookies as $cookie)
             {
-                setcookie(
-                    name: $cookie->getName(),
-                    value: $cookie->getValue(),
-                    expires_or_options: $cookie->getExpires(),
-                    path: $cookie->getPath(),
-                    domain: $cookie->getDomain(),
-                    secure: $cookie->isSecure(),
-                    httponly: $cookie->isHttpOnly()
-                );
+                setcookie($cookie->getName(), $cookie->getValue(), [
+                    'expires' => $cookie->getExpires(),
+                    'path' => $cookie->getPath(),
+                    'domain' => $cookie->getDomain(),
+                    'secure' => $cookie->isSecure(),
+                    'httponly' => $cookie->isHttpOnly(),
+                    'samesite' => $cookie->getSameSite(),
+                ]);
             }
 
             // Handle response based on type
@@ -562,13 +567,18 @@
                 return;
             }
 
-            while (!feof($handle))
+            try
             {
-                print(fread($handle, 8192));
-                flush();
+                while (!feof($handle))
+                {
+                    print(fread($handle, 8192));
+                    flush();
+                }
             }
-
-            fclose($handle);
+            finally
+            {
+                fclose($handle);
+            }
         }
 
         /**
