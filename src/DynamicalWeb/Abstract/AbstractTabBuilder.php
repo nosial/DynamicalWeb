@@ -4,13 +4,30 @@
 
     abstract class AbstractTabBuilder
     {
+        /**
+         * Builds the HTML content for the tab.
+         *
+         * @return string The HTML content of the tab.
+         */
         abstract public static function build(): string;
 
+        /**
+         * Escapes a string for safe output in HTML.
+         *
+         * @param string $str The string to escape.
+         * @return string The escaped string.
+         */
         protected static function escape(string $str): string
         {
             return htmlspecialchars($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
 
+        /**
+         * Formats a time duration in seconds into a human-readable string with appropriate units.
+         *
+         * @param float $seconds The time duration in seconds.
+         * @return string The formatted time string.
+         */
         protected static function formatTime(float $seconds): string
         {
             if ($seconds < 0.001)
