@@ -13,6 +13,7 @@
         private string $domain;
         private bool $secure;
         private bool $httpOnly;
+        private string $sameSite;
 
         /**
          * Cookie Constructor
@@ -24,8 +25,9 @@
          * @param string $domain The domain the cookie is only valid in
          * @param bool $secure True if the Cookie can only be used in secured connections
          * @param bool $httpOnly True if the Cookie can only be used in HTTP only connections
+         * @param string $sameSite The SameSite attribute (None, Lax, or Strict)
          */
-        public function __construct(string $name, string $value, int $expires=0, string $path='/', string $domain='', bool $secure=false, bool $httpOnly=false)
+        public function __construct(string $name, string $value, int $expires=0, string $path='/', string $domain='', bool $secure=false, bool $httpOnly=false, string $sameSite='Lax')
         {
             $this->name = $name;
             $this->value = $value;
@@ -34,6 +36,7 @@
             $this->domain = $domain;
             $this->secure = $secure;
             $this->httpOnly = $httpOnly;
+            $this->sameSite = $sameSite;
         }
 
         /**
@@ -177,6 +180,26 @@
         }
 
         /**
+         * Returns the SameSite attribute of the Cookie
+         *
+         * @return string The SameSite attribute (None, Lax, or Strict)
+         */
+        public function getSameSite(): string
+        {
+            return $this->sameSite;
+        }
+
+        /**
+         * Sets the SameSite attribute of the Cookie
+         *
+         * @param string $sameSite The SameSite attribute (None, Lax, or Strict)
+         */
+        public function setSameSite(string $sameSite): void
+        {
+            $this->sameSite = $sameSite;
+        }
+
+        /**
          * @inheritDoc
          */
         public function toArray(): array
@@ -188,7 +211,8 @@
                 'path' => $this->path,
                 'domain' => $this->domain,
                 'secure' => $this->secure,
-                'httpOnly' => $this->httpOnly
+                'httpOnly' => $this->httpOnly,
+                'sameSite' => $this->sameSite
             ];
         }
 
@@ -204,7 +228,8 @@
                 $array['path'] ?? '/',
                 $array['domain'] ?? '',
                 $array['secure'] ?? false,
-                $array['httpOnly'] ?? false
+                $array['httpOnly'] ?? false,
+                $array['sameSite'] ?? 'Lax'
             );
         }
     }
