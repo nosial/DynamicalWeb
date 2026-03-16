@@ -189,8 +189,9 @@
         {
             return match($requestPath)
             {
-                '/dynaweb/debug/stats' => PathResolver::buildNccPath(PathConstants::DYNAMICAL_WEB->value, PathConstants::DYNAMICAL_PAGES->value, 'debug_api_stats.php'),
-                default               => null,
+                '/dynaweb/debug/stats'  => PathResolver::buildNccPath(PathConstants::DYNAMICAL_WEB->value, PathConstants::DYNAMICAL_PAGES->value, 'debug_api_stats.php'),
+                '/dynaweb/debug/cookie' => PathResolver::buildNccPath(PathConstants::DYNAMICAL_WEB->value, PathConstants::DYNAMICAL_PAGES->value, 'debug_api_cookie.php'),
+                default                 => null,
             };
         }
 
@@ -484,41 +485,50 @@
                 return self::$regexCache[$route] = $cached;
             }
 
-            // Escape special regex characters except {}
-            $pattern = preg_quote($route, '/');
-            
-            // Unescape the curly braces that were escaped by preg_quote
-            $pattern = str_replace(['\{', '\}'], ['{', '}'], $pattern);
-            
-            // Replace parameter placeholders with regex patterns
-            // Supports: {param} or {param:constraint}
-            $pattern = preg_replace_callback(
-                '/\{([a-zA-Z0-9_]+)(?::([^}]+))?}/',
-                function($matches)
+            // Extract parameter placeholders before preg_quote to preserve constraint regex patterns
+            // Uses (?:[^{}]*|\{[^}]*\})* to handle one level of nested braces in constraints (e.g., {2,4})
+            $paramTokens = [];
+            $tokenIndex = 0;
+            $routeForQuoting = preg_replace_callback(
+                '/\{([a-zA-Z0-9_]+)(?::((?:[^{}]*|\{[^}]*\})*))?}/',
+                function($matches) use (&$paramTokens, &$tokenIndex)
                 {
-                    $paramName = $matches[1];
-                    $constraint = $matches[2] ?? null;
-                    
-                    // If constraint is provided, use it
-                    if ($constraint !== null)
-                    {
-                        // Common constraint shortcuts
-                        return match($constraint)
-                        {
-                            'int', 'integer', 'num', 'number' => '(\d+)',
-                            'alpha' => '([a-zA-Z]+)',
-                            'alnum', 'alphanumeric' => '([a-zA-Z0-9]+)',
-                            'uuid' => '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})',
-                            'slug' => '([a-z0-9]+(?:-[a-z0-9]+)*)',
-                            default => '(' . $constraint . ')'
-                        };
-                    }
-                    
-                    // Default: match anything except forward slash
-                    return '([^\/]+)';
+                    $token = "___DWPARAM{$tokenIndex}___";
+                    $paramTokens[$token] = $matches;
+                    $tokenIndex++;
+                    return $token;
                 },
-                $pattern
+                $route
             );
+
+            // Escape special regex characters in the literal parts of the route
+            $pattern = preg_quote($routeForQuoting, '/');
+
+            // Replace tokens with proper regex capture groups
+            foreach($paramTokens as $token => $matches)
+            {
+                $constraint = $matches[2] ?? null;
+                if($constraint !== null)
+                {
+                    // Common constraint shortcuts
+                    $replacement = match($constraint)
+                    {
+                        'int', 'integer', 'num', 'number' => '(\d+)',
+                        'alpha' => '([a-zA-Z]+)',
+                        'alnum', 'alphanumeric' => '([a-zA-Z0-9]+)',
+                        'uuid' => '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})',
+                        'slug' => '([a-z0-9]+(?:-[a-z0-9]+)*)',
+                        default => '(' . $constraint . ')'
+                    };
+                }
+                else
+                {
+                    // Default: match anything except forward slash
+                    $replacement = '([^\/]+)';
+                }
+
+                $pattern = str_replace(preg_quote($token, '/'), $replacement, $pattern);
+            }
             
             // Add start and end anchors
             $regex = '/^' . $pattern . '$/';
