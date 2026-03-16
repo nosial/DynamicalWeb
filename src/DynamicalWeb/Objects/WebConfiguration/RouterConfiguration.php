@@ -7,41 +7,39 @@
 
     class RouterConfiguration implements SerializableInterface
     {
-        private string $baseUrl;
         private string $basePath;
         private array $responseHandlers;
         /**
          * @var array<string, Route>
          */
         private array $routes;
+        /**
+         * @var array<string, Route>
+         */
+        private array $routesById;
 
         /**
          * RouterConfiguration Constructor
          *
-         * @param array $data The router configuration data containing 'base_url', 'base_path', optional 'response_handlers', and 'routes'
+         * @param array $data The router configuration data containing 'base_path', optional 'response_handlers', and 'routes'
          */
         public function __construct(array $data)
         {
-            $this->baseUrl = $data['base_url'];
             $this->basePath = $data['base_path'];
             $this->responseHandlers = $data['response_handlers'] ?? [];
             $this->routes = [];
+            $this->routesById = [];
 
             foreach($data['routes'] as $routeData)
             {
                 $route = new Route($routeData);
                 $this->routes[$route->getPath()] = $route;
-            }
-        }
 
-        /**
-         * Returns the base URL for the router configuration
-         *
-         * @return string The base URL
-         */
-        public function getBaseUrl(): string
-        {
-            return $this->baseUrl;
+                if($route->getId() !== null)
+                {
+                    $this->routesById[$route->getId()] = $route;
+                }
+            }
         }
 
         /**
@@ -102,12 +100,22 @@
         }
 
         /**
+         * Returns the Route object associated with a given ID
+         *
+         * @param string $id The route ID to look up
+         * @return Route|null The Route object with the given ID, or null if not found
+         */
+        public function getRouteById(string $id): ?Route
+        {
+            return $this->routesById[$id] ?? null;
+        }
+
+        /**
          * @inheritDoc
          */
         public function toArray(): array
         {
             $output = [
-                'base_url' => $this->baseUrl,
                 'base_path' => $this->basePath,
                 'response_handlers' => $this->responseHandlers,
                 'routes' => []
