@@ -34,7 +34,7 @@
             // Built-in /dynaweb/* paths are never APCu-cached (dynamic/debug endpoints)
             if (str_starts_with($requestPath, self::BUILTIN_RESOURCE_PREFIX))
             {
-                return self::resolveBuiltinPath($requestPath, $webConfiguration, $webRootPath);
+                return self::resolveBuiltinPath($requestPath, $webConfiguration);
             }
 
             // Special handling for /dynaweb root
@@ -63,7 +63,7 @@
             $route  = $result->getRoute();
             Apcu::store($cacheKey, [
                 'module' => $result->getModule(),
-                'route'  => $route !== null ? $route->getPath() : null,
+                'route'  => $route?->getPath(),
             ]);
 
             return $result;
@@ -74,10 +74,9 @@
          *
          * @param string $requestPath The normalized request path starting with /dynaweb/
          * @param WebConfiguration $webConfiguration The web configuration containing application settings (e.g. debug panel enabled)
-         * @param string $webRootPath The web root path for resolving module paths
          * @return RouteResult Result containing module path and null route (built-in paths do not have associated Route objects)
          */
-        private static function resolveBuiltinPath(string $requestPath, WebConfiguration $webConfiguration, string $webRootPath): RouteResult
+        private static function resolveBuiltinPath(string $requestPath, WebConfiguration $webConfiguration): RouteResult
         {
             // Debug API routes — only available when debug panel is enabled
             if (str_starts_with($requestPath, self::BUILTIN_RESOURCE_PREFIX . 'debug/'))
@@ -314,12 +313,7 @@
         private static function resolveModulePath(string $webRootPath, string $modulePath): string
         {
             // Build the full path by appending module path to webRootPath
-            $fullPath = rtrim($webRootPath, '/') . '/' . ltrim($modulePath, '/');
-            
-            // Normalize the path
-            $fullPath = PathResolver::normalizePath($fullPath);
-            
-            return $fullPath;
+            return PathResolver::normalizePath(rtrim($webRootPath, '/') . '/' . ltrim($modulePath, '/'));
         }
 
         /**
@@ -490,7 +484,7 @@
             $paramTokens = [];
             $tokenIndex = 0;
             $routeForQuoting = preg_replace_callback(
-                '/\{([a-zA-Z0-9_]+)(?::((?:[^{}]*|\{[^}]*\})*))?}/',
+                '/\{([a-zA-Z0-9_]+)(?::((?:[^{}]*|\{[^}]*})*))?}/',
                 function($matches) use (&$paramTokens, &$tokenIndex)
                 {
                     $token = "___DWPARAM{$tokenIndex}___";
