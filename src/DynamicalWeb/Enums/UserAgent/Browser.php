@@ -96,7 +96,7 @@
                 }
                 
                 // Brave
-                if (preg_match('/Brave[/ ](\d+(?:\.\d+)*)/i', $ua, $brave))
+                if (preg_match('/Brave[\/ ](\d+(?:\.\d+)*)/i', $ua, $brave))
                 {
                     $version = $brave[1];
                     return self::BRAVE;
