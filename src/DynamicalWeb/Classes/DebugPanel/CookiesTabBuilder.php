@@ -51,8 +51,8 @@
                        . '<span class="dw-param-key">' . $dispName . '</span>'
                        . '<span class="dw-param-value" style="flex:1;">' . $dispValue . '</span>'
                        . '<span class="dw-cookie-actions">'
-                       . '<button class="dw-btn dw-btn-edit" data-safeid="' . $safeId . '" data-name="' . $attrName . '">&#9998; Edit</button>'
-                       . '<button class="dw-btn dw-btn-danger" data-action="del-ck" data-name="' . $attrName . '">&#215; Delete</button>'
+                       . '<button type="button" class="dw-btn dw-btn-edit" data-safeid="' . $safeId . '" data-name="' . $attrName . '">&#9998; Edit</button>'
+                       . '<button type="button" class="dw-btn dw-btn-danger" data-action="del-ck" data-name="' . $attrName . '">&#215; Delete</button>'
                        . '</span>'
                        . '</div>';
 
@@ -78,8 +78,8 @@
                        . '</div>'
                        . '</div>'
                        . '<div class="dw-ck-form-actions">'
-                       . '<button class="dw-btn dw-btn-save" data-action="save-ck" data-safeid="' . $safeId . '" data-name="' . $attrName . '">&#10003; Save</button>'
-                       . '<button class="dw-btn" data-action="cancel-ck" data-safeid="' . $safeId . '">Cancel</button>'
+                       . '<button type="button" class="dw-btn dw-btn-save" data-action="save-ck" data-safeid="' . $safeId . '" data-name="' . $attrName . '">&#10003; Save</button>'
+                       . '<button type="button" class="dw-btn" data-action="cancel-ck" data-safeid="' . $safeId . '">Cancel</button>'
                        . '</div>'
                        . '</div>';
             }
@@ -156,7 +156,7 @@
                      . '</div>'
                      . '</div>'
                      . '<div class="dw-ck-form-actions">'
-                     . '<button class="dw-btn dw-btn-save" onclick="dwAddCookie()">&#43; Set cookie</button>'
+                     . '<button type="button" class="dw-btn dw-btn-save" onclick="dwAddCookie()">&#43; Set cookie</button>'
                      . '</div>'
                      . '</div>';
 
