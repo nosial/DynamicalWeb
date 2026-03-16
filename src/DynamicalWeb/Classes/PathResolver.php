@@ -18,7 +18,14 @@
          */
         public static function sanitizePath(string $path): string
         {
-            return str_replace(['../', '..\\'], '', $path);
+            // Loop until no more traversal sequences remain (prevents ....// → ../ bypass)
+            do
+            {
+                $path = str_replace(['../', '..\\'], '', $path, $count);
+            }
+            while ($count > 0);
+
+            return $path;
         }
 
         /**
