@@ -108,7 +108,7 @@
 
             // Parse uploaded files into UploadedFile objects
             $this->parseUploadedFiles();
-            $this->pathParameters = Router::extractPathParameters($webConfiguration, $this, $package);
+            $this->pathParameters = Router::extractPathParameters($webConfiguration, $this);
 
             // Detect language from Accept-Language header
             $this->detectedLanguage = null;
