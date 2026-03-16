@@ -9,10 +9,10 @@
     use DynamicalWeb\Objects\Request;
     use DynamicalWeb\Objects\Response;
     use DynamicalWeb\Objects\WebConfiguration\Route;
-    use Exception;
     use Symfony\Component\Yaml\Exception\ParseException;
     use Symfony\Component\Yaml\Yaml;
     use Throwable;
+    use Exception;
 
     class WebSession
     {
@@ -24,6 +24,7 @@
         private static ?Locale $locale=null;
         private static ?Throwable $exception=null;
         private static array $localeFileCache = [];
+        private static ?array $variables;
 
         /**
          * Starts the web session instance with the provided DynamicalWeb instance.
@@ -37,18 +38,29 @@
             self::$instance = $dynamicalWeb;
             self::$request = new Request($dynamicalWeb->getWebConfiguration(), $dynamicalWeb->getPackage(), $dynamicalWeb);
             self::$response = new Response();
-
             $routeResult = Router::findRouteWithDetails(
                 webConfiguration: self::$instance->getWebConfiguration(),
                 request: self::$request,
                 webRootPath: self::$instance->getWebRootPath(),
                 webResourcesPath: self::$instance->getWebResourcesPath()
             );
-
             self::$module = $routeResult->getModule();
             self::$currentRoute = $routeResult->getRoute();
             self::$exception = null;
+            self::$variables = [];
             self::loadLocale();
+        }
+
+        /**
+         * Ensures that a Response object exists in the session. If startSession() failed before
+         * creating one, this method creates a fresh Response so error handling can proceed.
+         */
+        public static function ensureResponse(): void
+        {
+            if (self::$response === null)
+            {
+                self::$response = new Response();
+            }
         }
 
         /**
@@ -63,6 +75,7 @@
             self::$currentRoute = null;
             self::$locale = null;
             self::$exception = null;
+            self::$variables = null;
         }
 
         /**
@@ -146,6 +159,62 @@
         }
 
         /**
+         * Sets a custom variable in the web session that can be accessed globally during the request lifecycle.
+         *
+         * @param string $key The key to identify the variable.
+         * @param mixed $value The value to store, which can be of any type.
+         */
+        public static function set(string $key, mixed $value): void
+        {
+            if (self::$variables === null)
+            {
+                self::$variables = [];
+            }
+
+            self::$variables[$key] = $value;
+        }
+
+        /**
+         * Retrieves a custom variable from the web session by its key.
+         *
+         * @param string $key The key of the variable to retrieve.
+         * @return mixed The value of the variable, or null if it does not exist.
+         */
+        public static function get(string $key): mixed
+        {
+            if (self::$variables === null || !array_key_exists($key, self::$variables))
+            {
+                return null;
+            }
+
+            return self::$variables[$key];
+        }
+
+        /**
+         * Checks if a custom variable exists in the web session.
+         *
+         * @param string $key The key of the variable to check.
+         * @return bool True if the variable exists, false otherwise.
+         */
+        public static function exists(string $key): bool
+        {
+            return self::$variables !== null && array_key_exists($key, self::$variables);
+        }
+
+        /**
+         * Unsets a custom variable from the web session.
+         *
+         * @param string $key The key of the variable to unset.
+         */
+        public static function unset(string $key): void
+        {
+            if (self::$variables !== null)
+            {
+                unset(self::$variables[$key]);
+            }
+        }
+
+        /**
          * Loads the single best-matching locale for the current request.
          * Priority: locale cookie → Accept-Language → configured default → first available.
          * Skipped silently if no locales are configured.
@@ -164,7 +233,7 @@
 
             // Priority 1: enforced locale cookie (set by /dynaweb/language/{id})
             $cookieLocale = self::$request->getCookie('locale');
-            if ($cookieLocale !== null && is_string($cookieLocale))
+            if (is_string($cookieLocale))
             {
                 $cookieLocale = preg_replace('/[^a-z0-9_\-]/i', '', $cookieLocale);
                 $cookieLocale = strtolower(substr($cookieLocale, 0, 10));
