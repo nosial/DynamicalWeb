@@ -140,34 +140,34 @@
                 self::collectRouteInfo($route),
                 self::collectResponseMetrics($response),
                 [
-                    'requestSectionsHtml'    => RequestTabBuilder::build(),
-                    'responseSectionsHtml'   => ResponseTabBuilder::build(),
-                    'cookiesSectionsHtml'    => CookiesTabBuilder::build(),
-                    'cookieCount'            => count($_COOKIE),
-                    'appSectionsHtml'        => AppTabBuilder::build(),
-                    'phpSectionsHtml'        => PhpTabBuilder::build(),
-                    'extensionsSectionsHtml' => ExtensionsTabBuilder::build(),
-                    'opcacheSectionsHtml'    => OpcacheTabBuilder::build(),
-                    'serverSectionsHtml'     => ServerTabBuilder::build(),
-                    'constantsSectionsHtml'  => ConstantsTabBuilder::build(),
-                    'sessionSectionsHtml'    => SessionTabBuilder::build(),
-                    'sessionCount'           => session_status() === PHP_SESSION_ACTIVE ? count($_SESSION) : -1,
-                    'routesSectionsHtml'     => RoutesTabBuilder::build(),
-                    'routeCount'             => self::getRouteCount(),
-                    'sectionsSectionsHtml'   => SectionsTabBuilder::build(),
-                    'sectionsCount'          => self::getSectionCount(),
-                    'iniSectionsHtml'        => IniTabBuilder::build(),
-                    'apcuSectionsHtml'       => ApcuTabBuilder::build(),
-                    'hasApcu'                => Apcu::isExtensionAvailable(),
-                    'localeSectionsHtml'     => LocaleTabBuilder::build(),
-                    'hasLocale'              => WebSession::getLocale() !== null,
-                    'localeSwitcherHtml'     => LocaleTabBuilder::buildLocaleSwitcherHtml($request),
-                    'errorLogHtml'           => self::buildErrorLogHtml(),
-                    'hasErrorLog'            => self::hasErrorLogAccess(),
-                    'executedFilesHtml'      => ProfilerTabBuilder::build(),
-                    'phpIncludedFilesHtml'   => ProfilerTabBuilder::buildIncluded($includedFiles),
-                    'phpIncludedCount'       => count($includedFiles),
-                    'responseBodySize'       => self::formatBytes(strlen($response->getBody())),
+                    'dw_request_sections_html'    => RequestTabBuilder::build(),
+                    'dw_response_sections_html'   => ResponseTabBuilder::build(),
+                    'dw_cookies_sections_html'    => CookiesTabBuilder::build(),
+                    'dw_cookie_count'            => count($_COOKIE),
+                    'dw_app_sections_html'        => AppTabBuilder::build(),
+                    'dw_php_sections_html'        => PhpTabBuilder::build(),
+                    'dw_extensions_sections_html' => ExtensionsTabBuilder::build(),
+                    'dw_opcache_sections_html'    => OpcacheTabBuilder::build(),
+                    'dw_server_sections_html'     => ServerTabBuilder::build(),
+                    'dw_constants_sections_html'  => ConstantsTabBuilder::build(),
+                    'dw_session_sections_html'    => SessionTabBuilder::build(),
+                    'dw_session_count'           => session_status() === PHP_SESSION_ACTIVE ? count($_SESSION) : -1,
+                    'dw_routes_sections_html'     => RoutesTabBuilder::build(),
+                    'dw_route_count'             => self::getRouteCount(),
+                    'dw_sections_sections_html'   => SectionsTabBuilder::build(),
+                    'dw_sections_count'          => self::getSectionCount(),
+                    'dw_ini_sections_html'        => IniTabBuilder::build(),
+                    'dw_apcu_sections_html'       => ApcuTabBuilder::build(),
+                    'dw_has_apcu'                => Apcu::isExtensionAvailable(),
+                    'dw_locale_sections_html'     => LocaleTabBuilder::build(),
+                    'dw_has_locale'              => WebSession::getLocale() !== null,
+                    'dw_locale_switcher_html'     => LocaleTabBuilder::buildLocaleSwitcherHtml($request),
+                    'dw_error_log_html'           => self::buildErrorLogHtml(),
+                    'dw_has_error_log'            => self::hasErrorLogAccess(),
+                    'dw_executed_files_html'      => ProfilerTabBuilder::build(),
+                    'dw_php_included_files_html'   => ProfilerTabBuilder::buildIncluded($includedFiles),
+                    'dw_php_included_count'       => count($includedFiles),
+                    'dw_response_body_size'       => self::formatBytes(strlen($response->getBody())),
                 ]
             );
 
@@ -214,13 +214,13 @@
             }
 
             return [
-                'formattedTime'    => self::formatTime($executionTime),
-                'formattedMemory'  => self::formatBytes($memoryUsage),
-                'formattedPeak'    => self::formatBytes($peakBytes),
-                'formattedMemLimit'=> $memLimitBytes === -1 ? 'Unlimited' : self::formatBytes($memLimitBytes),
-                'peakMemPct'       => $peakPct !== null ? $peakPct . '%' : null,
-                'cpuUser'          => $cpuUser !== null ? self::formatTime($cpuUser / 1_000_000) : null,
-                'cpuSys'           => $cpuSys  !== null ? self::formatTime($cpuSys  / 1_000_000) : null,
+                'dw_formatted_time'    => self::formatTime($executionTime),
+                'dw_formatted_memory'  => self::formatBytes($memoryUsage),
+                'dw_formatted_peak'    => self::formatBytes($peakBytes),
+                'dw_formatted_mem_limit'=> $memLimitBytes === -1 ? 'Unlimited' : self::formatBytes($memLimitBytes),
+                'dw_peak_mem_pct'       => $peakPct !== null ? $peakPct . '%' : null,
+                'dw_cpu_user'          => $cpuUser !== null ? self::formatTime($cpuUser / 1_000_000) : null,
+                'dw_cpu_sys'           => $cpuSys  !== null ? self::formatTime($cpuSys  / 1_000_000) : null,
             ];
         }
 
@@ -251,23 +251,23 @@
             }
 
             return [
-                'requestId'       => $request ? self::escape($request->getId()) : 'N/A',
-                'requestMethod'   => $request ? $request->getMethod()->value : 'N/A',
-                'requestPath'     => $request ? $request->getPath() : 'N/A',
-                'requestHost'     => $request ? $request->getHost() : 'N/A',
-                'clientIp'        => $request ? ($request->getClientIp() ?? 'Unknown') : 'Unknown',
-                'referer'         => self::escape($request ? ($request->getHeader('Referer') ?? 'None') : 'None'),
-                'isSecure'        => $request ? ($request->isSecure() ? 'Yes (HTTPS)' : 'No (HTTP)') : 'Unknown',
-                'httpVersion'     => $request ? $request->getHttpVersion() : 'N/A',
-                'detectedLanguage'=> $request ? ($request->getDetectedLanguage() ?? 'N/A') : 'N/A',
-                'fileCount'       => $request ? $request->getFileCount() : 0,
-                'totalFileSize'   => $request ? self::formatBytes($request->getTotalFileSize()) : '0 B',
-                'headersCount'    => $request ? count($request->getHeaders()) : 0,
-                'queryCount'      => $request ? count($request->getQueryParameters()) : 0,
-                'bodyCount'       => $request ? count($request->getBodyParameters()) : 0,
-                'pathCount'       => $request ? count($request->getPathParameters()) : 0,
-                'cookiesCount'    => $request ? count($request->getCookies()) : 0,
-                'debugStatsUrl'   => $debugStatsUrl,
+                'dw_request_id'       => $request ? self::escape($request->getId()) : 'N/A',
+                'dw_request_method'   => $request ? $request->getMethod()->value : 'N/A',
+                'dw_request_path'     => $request ? $request->getPath() : 'N/A',
+                'dw_request_host'     => $request ? $request->getHost() : 'N/A',
+                'dw_client_ip'        => $request ? ($request->getClientIp() ?? 'Unknown') : 'Unknown',
+                'dw_referer'         => self::escape($request ? ($request->getHeader('Referer') ?? 'None') : 'None'),
+                'dw_is_secure'        => $request ? ($request->isSecure() ? 'Yes (HTTPS)' : 'No (HTTP)') : 'Unknown',
+                'dw_http_version'     => $request ? $request->getHttpVersion() : 'N/A',
+                'dw_detected_language'=> $request ? ($request->getDetectedLanguage() ?? 'N/A') : 'N/A',
+                'dw_file_count'       => $request ? $request->getFileCount() : 0,
+                'dw_total_file_size'   => $request ? self::formatBytes($request->getTotalFileSize()) : '0 B',
+                'dw_headers_count'    => $request ? count($request->getHeaders()) : 0,
+                'dw_query_count'      => $request ? count($request->getQueryParameters()) : 0,
+                'dw_body_count'       => $request ? count($request->getBodyParameters()) : 0,
+                'dw_path_count'       => $request ? count($request->getPathParameters()) : 0,
+                'dw_cookies_count'    => $request ? count($request->getCookies()) : 0,
+                'dw_debug_stats_url'   => $debugStatsUrl,
             ];
         }
 
@@ -288,10 +288,10 @@
             }
 
             return [
-                'escapedModule'      => self::escape($route ? $route->getModule() : 'N/A'),
-                'routePath'          => $route ? self::escape($route->getPath()) : 'N/A',
-                'routeLocaleId'      => $route ? ($route->getLocaleId() ?? 'None') : 'N/A',
-                'routeAllowedMethods'=> $routeAllowedMethods,
+                'dw_escaped_module'      => self::escape($route ? $route->getModule() : 'N/A'),
+                'dw_route_path'          => $route ? self::escape($route->getPath()) : 'N/A',
+                'dw_route_locale_id'      => $route ? ($route->getLocaleId() ?? 'None') : 'N/A',
+                'dw_route_allowed_methods'=> $routeAllowedMethods,
             ];
         }
 
@@ -304,15 +304,15 @@
         private static function collectResponseMetrics(Response $response): array
         {
             return [
-                'statusCode'          => $response->getStatusCode()->value,
-                'statusText'          => self::escape($response->getStatusCode()->getMessage()),
-                'statusClass'         => self::getStatusClass($response->getStatusCode()->value),
-                'escapedContentType'  => self::escape($response->getContentType()),
-                'escapedCharset'      => self::escape($response->getCharset()),
-                'escapedPhpVersion'   => self::escape(PHP_VERSION),
-                'responseHeadersCount'=> count($response->getHeaders()),
-                'responseCookiesCount'=> count($response->getCookies()),
-                'executedFilesCount'  => count(self::$executedFiles),
+                'dw_status_code'          => $response->getStatusCode()->value,
+                'dw_status_text'          => self::escape($response->getStatusCode()->getMessage()),
+                'dw_status_class'         => self::getStatusClass($response->getStatusCode()->value),
+                'dw_escaped_content_type'  => self::escape($response->getContentType()),
+                'dw_escaped_charset'      => self::escape($response->getCharset()),
+                'dw_escaped_php_version'   => self::escape(PHP_VERSION),
+                'dw_response_headers_count'=> count($response->getHeaders()),
+                'dw_response_cookies_count'=> count($response->getCookies()),
+                'dw_executed_files_count'  => count(self::$executedFiles),
             ];
         }
 
@@ -446,14 +446,30 @@
         }
 
         /**
-         * Generates the HTML content for the debug panel iframe by rendering the appropriate template with the collected variables
+         * Generates the HTML content for the debug panel iframe by storing all variables in WebSession,
+         * rendering the template, then cleaning up the stored variables.
          *
-         * @param array $vars An associative array of variables to pass to the template for rendering
+         * @param array $vars An associative array of variables to make available to the template via WebSession
          * @return string The rendered HTML content for the debug panel iframe
          */
         private static function generateIframeContent(array $vars): string
         {
-            return self::renderTemplate(PathResolver::buildNccPath(PathConstants::DYNAMICAL_WEB->value, PathConstants::DYNAMICAL_PAGES->value, 'debug.phtml'), $vars);
+            foreach ($vars as $key => $value)
+            {
+                WebSession::set($key, $value);
+            }
+
+            $html = self::renderTemplate(
+                PathResolver::buildNccPath(PathConstants::DYNAMICAL_WEB->value, PathConstants::DYNAMICAL_PAGES->value, 'debug.phtml'),
+                []
+            );
+
+            foreach (array_keys($vars) as $key)
+            {
+                WebSession::unset($key);
+            }
+
+            return $html;
         }
 
         /**
