@@ -322,7 +322,8 @@
                 return null;
             }
 
-            if ($this->size > $maxSize)
+            $actualSize = filesize($this->tmpPath);
+            if ($actualSize === false || $actualSize > $maxSize)
             {
                 throw new RuntimeException('File too large to read into memory. Use getStream() instead.');
             }
