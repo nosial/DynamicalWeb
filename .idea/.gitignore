@@ -6,3 +6,10 @@
 # Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
+/copilot.data.migration.ask2agent.xml
+/DynamicalWeb.iml
+/modules.xml
+/php.xml
+/php-test-framework.xml
+/phpunit.xml
+/vcs.xml
