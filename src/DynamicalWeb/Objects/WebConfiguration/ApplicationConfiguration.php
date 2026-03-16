@@ -17,13 +17,21 @@
         private ?array $postRequest;
         private bool $debugPanel;
         private bool $disableApcu;
+        private bool $disableDefaultHeaders;
+        private int $staticCacheMaxAge;
+        private int $apcuContentMaxSize;
+        private int $apcuContentTtl;
+        private int $apcuMetaTtl;
+        private int $apcuConfigTtl;
 
         /**
          * ApplicationConfiguration Constructor
          *
          * @param array $data The application configuration data containing 'name', 'root', 'resources',
          *        optional 'default_locale', 'report_errors', optional 'xss_level', optional 'pre_request',
-         *        optional 'post_request', optional 'debug_panel', and optional 'disable_apcu'
+         *        optional 'post_request', optional 'debug_panel', optional 'disable_apcu', optional 'disable_default_headers',
+         *        optional 'static_cache_max_age', optional 'apcu_content_max_size', optional 'apcu_content_ttl',
+         *        optional 'apcu_meta_ttl', and optional 'apcu_config_ttl'
          */
         public function __construct(array $data)
         {
@@ -37,6 +45,12 @@
             $this->postRequest = $data['post_request'] ?? null;
             $this->debugPanel = $data['debug_panel'] ?? false;
             $this->disableApcu = $data['disable_apcu'] ?? false;
+            $this->disableDefaultHeaders = $data['disable_default_headers'] ?? false;
+            $this->staticCacheMaxAge = $data['static_cache_max_age'] ?? 3600;
+            $this->apcuContentMaxSize = $data['apcu_content_max_size'] ?? 262144;
+            $this->apcuContentTtl = $data['apcu_content_ttl'] ?? 3600;
+            $this->apcuMetaTtl = $data['apcu_meta_ttl'] ?? 10;
+            $this->apcuConfigTtl = $data['apcu_config_ttl'] ?? 60;
         }
 
         /**
@@ -140,6 +154,67 @@
         }
 
         /**
+         * Returns true when the default framework headers (X-Powered-By, X-Request-ID) should be omitted from responses.
+         *
+         * @return bool True if default headers are disabled, false otherwise
+         */
+        public function isDefaultHeadersDisabled(): bool
+        {
+            return $this->disableDefaultHeaders;
+        }
+
+        /**
+         * Returns the maximum age in seconds for caching static file responses via the Cache-Control header.
+         *
+         * @return int The max-age value in seconds (default: 3600)
+         */
+        public function getStaticCacheMaxAge(): int
+        {
+            return $this->staticCacheMaxAge;
+        }
+
+        /**
+         * Returns the maximum file size in bytes eligible for APCu content caching.
+         * Files larger than this threshold are streamed directly from disk.
+         *
+         * @return int The max size in bytes (default: 262144 / 256 KB)
+         */
+        public function getApcuContentMaxSize(): int
+        {
+            return $this->apcuContentMaxSize;
+        }
+
+        /**
+         * Returns the TTL in seconds for cached static file content stored in APCu.
+         *
+         * @return int The TTL in seconds (default: 3600)
+         */
+        public function getApcuContentTtl(): int
+        {
+            return $this->apcuContentTtl;
+        }
+
+        /**
+         * Returns the TTL in seconds for cached file metadata (mtime, size) stored in APCu.
+         *
+         * @return int The TTL in seconds (default: 10)
+         */
+        public function getApcuMetaTtl(): int
+        {
+            return $this->apcuMetaTtl;
+        }
+
+        /**
+         * Returns the TTL in seconds for the parsed web configuration cached in APCu.
+         *
+         * @return int The TTL in seconds (default: 60)
+         */
+        public function getApcuConfigTtl(): int
+        {
+            return $this->apcuConfigTtl;
+        }
+
+        /**
          * @inheritDoc
          */
         public function toArray(): array
@@ -155,6 +230,12 @@
                 'post_request' => $this->postRequest,
                 'debug_panel' => $this->debugPanel,
                 'disable_apcu' => $this->disableApcu,
+                'disable_default_headers' => $this->disableDefaultHeaders,
+                'static_cache_max_age' => $this->staticCacheMaxAge,
+                'apcu_content_max_size' => $this->apcuContentMaxSize,
+                'apcu_content_ttl' => $this->apcuContentTtl,
+                'apcu_meta_ttl' => $this->apcuMetaTtl,
+                'apcu_config_ttl' => $this->apcuConfigTtl,
             ];
         }
 
