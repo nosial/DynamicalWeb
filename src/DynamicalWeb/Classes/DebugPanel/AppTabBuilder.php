@@ -27,10 +27,11 @@
                 {
                     $appCfg           = $instance->getWebConfiguration()->getApplication();
                     $routerCfg        = $instance->getWebConfiguration()->getRouter();
+                    $request          = WebSession::getRequest();
                     $appName          = self::escape($appCfg->getName());
                     $appXssLevel      = self::escape($appCfg->getXssLevel()->name);
                     $appErrReport     = $appCfg->errorReportingEnabled() ? 'Enabled' : 'Disabled';
-                    $routerBaseUrl    = self::escape($routerCfg->getBaseUrl());
+                    $routerBaseUrl    = self::escape(($request->isSecure() ? 'https' : 'http') . '://' . $request->getHost());
                     $routerBasePath   = self::escape($routerCfg->getBasePath());
                     $defaultLocale    = self::escape($appCfg->getDefaultLocale() ?? 'None');
                     $pre              = $appCfg->getPreRequest();
