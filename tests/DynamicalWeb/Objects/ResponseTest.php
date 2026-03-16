@@ -436,4 +436,20 @@
             $this->assertEquals('application/json', $response->getContentType());
             $this->assertEquals('{"ok":true}', $response->getBody());
         }
+
+        // Completed flag
+
+        public function testDefaultCompletedIsFalse(): void
+        {
+            $response = new Response();
+            $this->assertFalse($response->isCompleted());
+        }
+
+        public function testSetCompletedMarksResponseAsCompleted(): void
+        {
+            $response = new Response();
+            $result = $response->setCompleted();
+            $this->assertTrue($response->isCompleted());
+            $this->assertSame($response, $result);
+        }
     }
