@@ -270,23 +270,31 @@
                         {
                             ExecutionHandler::executePhp($preRequestModulePath);
                         }
+
+                        if(WebSession::getResponse()->isCompleted())
+                        {
+                            break;
+                        }
                     }
                 }
 
-                if(!$this->webConfiguration->getApplication()->isDefaultHeadersDisabled())
+                if(!WebSession::getResponse()->isCompleted())
                 {
-                    WebSession::getResponse()->setHeader('X-Powered-By', 'DynamicalWeb');
-                    WebSession::getResponse()->setHeader('X-Request-ID', WebSession::getRequest()->getId());
-                }
+                    if(!$this->webConfiguration->getApplication()->isDefaultHeadersDisabled())
+                    {
+                        WebSession::getResponse()->setHeader('X-Powered-By', 'DynamicalWeb');
+                        WebSession::getResponse()->setHeader('X-Request-ID', WebSession::getRequest()->getId());
+                    }
 
-                $modulePath = WebSession::getModule();
-                if($modulePath === null)
-                {
-                    $this->handleNotFoundResponse();
-                }
-                else
-                {
-                    $this->executeModule($modulePath);
+                    $modulePath = WebSession::getModule();
+                    if($modulePath === null)
+                    {
+                        $this->handleNotFoundResponse();
+                    }
+                    else
+                    {
+                        $this->executeModule($modulePath);
+                    }
                 }
 
 
