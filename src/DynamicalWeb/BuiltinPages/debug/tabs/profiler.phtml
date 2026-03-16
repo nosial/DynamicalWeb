@@ -1,0 +1,14 @@
+<?php
+    use DynamicalWeb\WebSession;
+?>
+<!-- Profiler Tab -->
+<div id="tab-files" class="dw-tab-content">
+    <?php if (WebSession::get('dw_executed_files_html')): ?>
+        <div class="dw-section-divider" style="padding:5px 12px;">
+            Execution Profiler &mdash; <?= WebSession::get('dw_executed_files_count') ?> file<?= WebSession::get('dw_executed_files_count') !== 1 ? 's' : '' ?>, total <?= WebSession::get('dw_formatted_time') ?>
+        </div>
+        <?= WebSession::get('dw_executed_files_html') ?>
+    <?php else: ?>
+        <div class="dw-empty-tab">No files were executed through the framework.</div>
+    <?php endif; ?>
+</div>

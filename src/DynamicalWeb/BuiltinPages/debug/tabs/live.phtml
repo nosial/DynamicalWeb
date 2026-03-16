@@ -1,0 +1,168 @@
+<?php
+    use DynamicalWeb\WebSession;
+?>
+<!-- Live Tab -->
+<?php if (WebSession::get('dw_debug_stats_url')): ?>
+    <div id="tab-live" class="dw-tab-content">
+        <!-- Status strip -->
+        <div style="background:#e8edf2;border-bottom:1px solid #c4cdd7;padding:3px 12px;display:flex;justify-content:space-between;align-items:center;">
+            <span id="live-status" style="font-size:10px;color:#555;">&#9679; Connecting...</span>
+            <a href="<?= htmlspecialchars(WebSession::get('dw_debug_stats_url')) ?>" target="_blank" style="font-size:10px;color:#2c4a6b;text-decoration:none;">Raw JSON &#8599;</a>
+        </div>
+
+        <table class="dw-content-table">
+            <!-- Memory -->
+            <tr><td colspan="4" class="dw-section-divider">Memory</td></tr>
+            <tr>
+                <td class="dw-label">PHP Usage</td>
+                <td class="dw-value">
+                    <div id="live-mem-val" style="margin-bottom:2px;">--</div>
+                    <div class="dw-live-bar-track"><div class="dw-live-bar-fill dw-blue" id="live-mem-fill" style="width:0%"></div></div>
+                </td>
+                <td class="dw-label">Peak Usage</td>
+                <td class="dw-value">
+                    <div id="live-peak-val" style="margin-bottom:2px;">--</div>
+                    <div class="dw-live-bar-track"><div class="dw-live-bar-fill dw-amber" id="live-peak-fill" style="width:0%"></div></div>
+                </td>
+            </tr>
+
+            <!-- System -->
+            <tr><td colspan="4" class="dw-section-divider">System</td></tr>
+            <tr>
+                <td class="dw-label">Load Avg (1m / 5m / 15m)</td>
+                <td class="dw-value"><span id="live-load">--</span></td>
+                <td class="dw-label">Disk (/)</td>
+                <td class="dw-value">
+                    <div id="live-disk-val" style="margin-bottom:2px;">--</div>
+                    <div class="dw-live-bar-track"><div class="dw-live-bar-fill dw-green" id="live-disk-fill" style="width:0%"></div></div>
+                </td>
+            </tr>
+
+            <!-- OPcache -->
+            <tr><td colspan="4" class="dw-section-divider">PHP / OPcache</td></tr>
+            <tr>
+                <td class="dw-label">Hit Rate</td>
+                <td class="dw-value">
+                    <div id="live-opcache-val" style="margin-bottom:2px;">--</div>
+                    <div class="dw-live-bar-track"><div class="dw-live-bar-fill dw-purple" id="live-opcache-fill" style="width:0%"></div></div>
+                </td>
+                <td class="dw-label">Cached Scripts</td>
+                <td class="dw-value"><span id="live-scripts">--</span></td>
+            </tr>
+            <tr>
+                <td class="dw-label">Memory Usage</td>
+                <td class="dw-value">
+                    <div id="live-opcache-mem-val" style="margin-bottom:2px;">--</div>
+                    <div class="dw-live-bar-track"><div class="dw-live-bar-fill dw-blue" id="live-opcache-mem-fill" style="width:0%"></div></div>
+                </td>
+                <td class="dw-label">Wasted Memory</td>
+                <td class="dw-value">
+                    <div id="live-opcache-wasted-val" style="margin-bottom:2px;">--</div>
+                    <div class="dw-live-bar-track"><div class="dw-live-bar-fill dw-amber" id="live-opcache-wasted-fill" style="width:0%"></div></div>
+                </td>
+            </tr>
+            <tr>
+                <td class="dw-label">OPcache Memory</td>
+                <td class="dw-value"><span id="live-opcache-mem">--</span></td>
+                <td class="dw-label">Included Files</td>
+                <td class="dw-value"><span id="live-files">--</span></td>
+            </tr>
+
+            <!-- APCu (hidden until data arrives) -->
+            <tbody id="live-apcu-section" style="display:none;">
+            <tr><td colspan="4" class="dw-section-divider">APCu</td></tr>
+            <tr>
+                <td class="dw-label">Hit Rate</td>
+                <td class="dw-value">
+                    <div id="live-apcu-hr-val" style="margin-bottom:2px;">--</div>
+                    <div class="dw-live-bar-track"><div class="dw-live-bar-fill dw-green" id="live-apcu-hr-fill" style="width:0%"></div></div>
+                </td>
+                <td class="dw-label">Entries</td>
+                <td class="dw-value"><span id="live-apcu-entries">--</span></td>
+            </tr>
+            <tr>
+                <td class="dw-label">Memory Usage</td>
+                <td class="dw-value">
+                    <div id="live-apcu-mem-val" style="margin-bottom:2px;">--</div>
+                    <div class="dw-live-bar-track"><div class="dw-live-bar-fill dw-purple" id="live-apcu-mem-fill" style="width:0%"></div></div>
+                </td>
+                <td class="dw-label">Hits / Misses</td>
+                <td class="dw-value"><span id="live-apcu-hits">--</span></td>
+            </tr>
+            </tbody>
+
+            <!-- History charts -->
+            <tr><td colspan="4" class="dw-section-divider">History (last 30 samples &bull; 2s interval)</td></tr>
+            <tr>
+                <td colspan="4" style="padding:0;">
+                    <div class="dw-live-charts-grid">
+                        <!-- PHP Memory -->
+                        <div class="dw-live-chart-cell">
+                            <div class="dw-live-chart-title">PHP Memory</div>
+                            <div class="dw-live-chart-wrap">
+                                <canvas id="chart-mem" height="52" style="width:100%;height:52px;display:block;"></canvas>
+                                <div id="chart-mem-msg" class="dw-live-chart-overlay">Collecting&hellip;</div>
+                            </div>
+                        </div>
+                        <!-- PHP Peak Memory -->
+                        <div class="dw-live-chart-cell">
+                            <div class="dw-live-chart-title">PHP Peak Memory</div>
+                            <div class="dw-live-chart-wrap">
+                                <canvas id="chart-peak" height="52" style="width:100%;height:52px;display:block;"></canvas>
+                                <div id="chart-peak-msg" class="dw-live-chart-overlay">Collecting&hellip;</div>
+                            </div>
+                        </div>
+                        <!-- OPcache Hit Rate -->
+                        <div class="dw-live-chart-cell">
+                            <div class="dw-live-chart-title">OPcache Hit Rate</div>
+                            <div class="dw-live-chart-wrap">
+                                <canvas id="chart-opcache-hr" height="52" style="width:100%;height:52px;display:block;"></canvas>
+                                <div id="chart-opcache-hr-msg" class="dw-live-chart-overlay">Collecting&hellip;</div>
+                            </div>
+                        </div>
+                        <!-- OPcache Memory -->
+                        <div class="dw-live-chart-cell">
+                            <div class="dw-live-chart-title">OPcache Memory</div>
+                            <div class="dw-live-chart-wrap">
+                                <canvas id="chart-opcache-mem" height="52" style="width:100%;height:52px;display:block;"></canvas>
+                                <div id="chart-opcache-mem-msg" class="dw-live-chart-overlay">Collecting&hellip;</div>
+                            </div>
+                        </div>
+                        <!-- Disk -->
+                        <div class="dw-live-chart-cell">
+                            <div class="dw-live-chart-title">Disk Usage (/)</div>
+                            <div class="dw-live-chart-wrap">
+                                <canvas id="chart-disk" height="52" style="width:100%;height:52px;display:block;"></canvas>
+                                <div id="chart-disk-msg" class="dw-live-chart-overlay">Collecting&hellip;</div>
+                            </div>
+                        </div>
+                        <!-- Load Avg -->
+                        <div class="dw-live-chart-cell">
+                            <div class="dw-live-chart-title">Load Avg (1m)</div>
+                            <div class="dw-live-chart-wrap">
+                                <canvas id="chart-load" height="52" style="width:100%;height:52px;display:block;"></canvas>
+                                <div id="chart-load-msg" class="dw-live-chart-overlay">Collecting&hellip;</div>
+                            </div>
+                        </div>
+                        <!-- APCu Hit Rate (hidden until APCu data arrives) -->
+                        <div id="chart-apcu-hr-cell" class="dw-live-chart-cell" style="display:none;">
+                            <div class="dw-live-chart-title">APCu Hit Rate</div>
+                            <div class="dw-live-chart-wrap">
+                                <canvas id="chart-apcu-hr" height="52" style="width:100%;height:52px;display:block;"></canvas>
+                                <div id="chart-apcu-hr-msg" class="dw-live-chart-overlay">Collecting&hellip;</div>
+                            </div>
+                        </div>
+                        <!-- APCu Memory (hidden until APCu data arrives) -->
+                        <div id="chart-apcu-mem-cell" class="dw-live-chart-cell" style="display:none;">
+                            <div class="dw-live-chart-title">APCu Memory</div>
+                            <div class="dw-live-chart-wrap">
+                                <canvas id="chart-apcu-mem" height="52" style="width:100%;height:52px;display:block;"></canvas>
+                                <div id="chart-apcu-mem-msg" class="dw-live-chart-overlay">Collecting&hellip;</div>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+<?php endif; ?>

@@ -1,0 +1,13 @@
+<?php
+    use DynamicalWeb\WebSession;
+?>
+<!-- Constants Tab -->
+<div id="tab-constants" class="dw-tab-content">
+    <?php if (WebSession::get('dw_constants_sections_html')): ?>
+        <table class="dw-content-table">
+            <?= WebSession::get('dw_constants_sections_html') ?>
+        </table>
+    <?php else: ?>
+        <div class="dw-empty-tab">No constants defined.</div>
+    <?php endif; ?>
+</div>

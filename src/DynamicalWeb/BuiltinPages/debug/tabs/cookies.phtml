@@ -1,0 +1,13 @@
+<?php 
+    use DynamicalWeb\WebSession;
+?>
+<!-- Cookies Tab -->
+<div id="tab-cookies" class="dw-tab-content">
+    <?php if (WebSession::get('dw_cookies_sections_html')): ?>
+        <table class="dw-content-table">
+            <?= WebSession::get('dw_cookies_sections_html') ?>
+        </table>
+    <?php else: ?>
+        <div class="dw-empty-tab">No cookie information available.</div>
+    <?php endif; ?>
+</div>

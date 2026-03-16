@@ -1,0 +1,16 @@
+<?php
+    use DynamicalWeb\WebSession;
+?>
+<!-- Error Log Tab -->
+<?php if (WebSession::get('dw_has_error_log')): ?>
+    <div id="tab-errors" class="dw-tab-content">
+        <?php if (WebSession::get('dw_error_log_html')): ?>
+            <div class="dw-section-divider" style="padding:5px 12px;">
+                Last entries from <code style="font-size:10px;"><?= htmlspecialchars(ini_get('error_log')) ?></code>
+            </div>
+        <?= WebSession::get('dw_error_log_html') ?>
+        <?php else: ?>
+            <div class="dw-empty-tab">Error log is empty or not accessible.</div>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>

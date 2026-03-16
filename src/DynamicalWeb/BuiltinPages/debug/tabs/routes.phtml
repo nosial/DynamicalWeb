@@ -1,0 +1,11 @@
+<?php
+    use DynamicalWeb\WebSession;
+?>
+<!-- Routes Tab -->
+<div id="tab-routes" class="dw-tab-content">
+    <?php if (WebSession::get('dw_routes_sections_html')): ?>
+        <?= WebSession::get('dw_routes_sections_html') ?>
+    <?php else: ?>
+        <div class="dw-empty-tab">No routes configured.</div>
+    <?php endif; ?>
+</div>

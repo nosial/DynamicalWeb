@@ -1,0 +1,13 @@
+<?php 
+    use DynamicalWeb\WebSession;
+?>
+<!-- OPcache Tab -->
+<div id="tab-opcache" class="dw-tab-content">
+    <?php if (WebSession::get('dw_opcache_sections_html')): ?>
+        <table class="dw-content-table">
+            <?= WebSession::get('dw_opcache_sections_html') ?>
+        </table>
+    <?php else: ?>
+        <div class="dw-empty-tab">OPcache is not available.</div>
+    <?php endif; ?>
+</div>

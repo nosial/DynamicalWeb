@@ -1,0 +1,13 @@
+<?php
+    use DynamicalWeb\WebSession;
+?>
+<!-- App Tab -->
+<div id="tab-app" class="dw-tab-content">
+    <?php if (WebSession::get('dw_app_sections_html')): ?>
+        <table class="dw-content-table">
+            <?= WebSession::get('dw_app_sections_html') ?>
+        </table>
+    <?php else: ?>
+        <div class="dw-empty-tab">No application information available.</div>
+    <?php endif; ?>
+</div>

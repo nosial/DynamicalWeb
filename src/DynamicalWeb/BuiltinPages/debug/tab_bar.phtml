@@ -1,0 +1,35 @@
+<?php
+    use DynamicalWeb\WebSession;
+?>
+<div class="dw-tab-bar">
+    <button class="dw-tab-btn dw-active" onclick="switchTab('overview', this)">Overview</button>
+    <button class="dw-tab-btn" onclick="switchTab('request', this)">Request</button>
+    <button class="dw-tab-btn" onclick="switchTab('response', this)">Response</button>
+    <button class="dw-tab-btn" onclick="switchTab('cookies', this)">Cookies (<?= WebSession::get('dw_cookie_count') ?>)</button>
+    <button class="dw-tab-btn" onclick="switchTab('app', this)">App</button>
+    <button class="dw-tab-btn" onclick="switchTab('php', this)">PHP</button>
+    <button class="dw-tab-btn" onclick="switchTab('extensions', this)">Extensions</button>
+    <button class="dw-tab-btn" onclick="switchTab('opcache', this)">OPcache</button>
+    <button class="dw-tab-btn" onclick="switchTab('server', this)">Server</button>
+    <button class="dw-tab-btn" onclick="switchTab('constants', this)">Constants</button>
+    <button class="dw-tab-btn" onclick="switchTab('routes', this)">Routes<?php if (WebSession::get('dw_route_count') > 0): ?> (<?= WebSession::get('dw_route_count') ?>)<?php endif; ?></button>
+    <?php if (WebSession::get('dw_sections_count') > 0): ?>
+        <button class="dw-tab-btn" onclick="switchTab('sections', this)">Sections (<?= WebSession::get('dw_sections_count') ?>)</button>
+    <?php endif; ?>
+    <button class="dw-tab-btn" onclick="switchTab('session', this)">Session<?php if (WebSession::get('dw_session_count') >= 0): ?> (<?= WebSession::get('dw_session_count') ?>)<?php endif; ?></button>
+    <?php if (WebSession::get('dw_has_locale')): ?>
+        <button class="dw-tab-btn" onclick="switchTab('locale', this)">Locale</button>
+    <?php endif; ?>
+    <button class="dw-tab-btn" onclick="switchTab('ini', this)">INI</button>
+    <?php if (WebSession::get('dw_has_apcu')): ?>
+        <button class="dw-tab-btn" onclick="switchTab('apcu', this)">APCu</button>
+    <?php endif; ?>
+    <button class="dw-tab-btn" onclick="switchTab('files', this)">Profiler (<?= WebSession::get('dw_executed_files_count') ?>)</button>
+    <button class="dw-tab-btn" onclick="switchTab('included', this)">Included (<?= WebSession::get('dw_php_included_count') ?>)</button>
+    <?php if (WebSession::get('dw_has_error_log')): ?>
+        <button class="dw-tab-btn" onclick="switchTab('errors', this)">Error Log</button>
+    <?php endif; ?>
+    <?php if (WebSession::get('dw_debug_stats_url')): ?>
+        <button class="dw-tab-btn" onclick="switchTab('live', this)">&#9679; Live</button>
+    <?php endif; ?>
+</div>

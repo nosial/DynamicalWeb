@@ -1,0 +1,18 @@
+<?php
+    use DynamicalWeb\WebSession;
+?>
+<!-- Locale Tab -->
+<?php if (WebSession::get('dw_has_locale')): ?>
+    <div id="tab-locale" class="dw-tab-content">
+        <?php if (WebSession::get('dw_locale_switcher_html')): ?>
+            <?= WebSession::get('dw_locale_switcher_html') ?>
+        <?php endif; ?>
+        <?php if (WebSession::get('dw_locale_sections_html')): ?>
+            <table class="dw-content-table">
+                <?= WebSession::get('dw_locale_sections_html') ?>
+            </table>
+        <?php else: ?>
+            <div class="dw-empty-tab">No locale information available.</div>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>

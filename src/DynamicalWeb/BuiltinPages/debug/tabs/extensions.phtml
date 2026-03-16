@@ -1,0 +1,13 @@
+<?php 
+    use DynamicalWeb\WebSession;
+?>
+<!-- Extensions Tab -->
+<div id="tab-extensions" class="dw-tab-content">
+    <?php if (WebSession::get('dw_extensions_sections_html')): ?>
+        <table class="dw-content-table">
+            <?= WebSession::get('dw_extensions_sections_html') ?>
+        </table>
+    <?php else: ?>
+        <div class="dw-empty-tab">No extensions loaded.</div>
+    <?php endif; ?>
+</div>

@@ -1,0 +1,15 @@
+<?php
+    use DynamicalWeb\WebSession;
+?>
+<!-- Sections Tab -->
+<?php if (WebSession::get('dw_sections_count') > 0): ?>
+    <div id="tab-sections" class="dw-tab-content">
+        <?php if (WebSession::get('dw_sections_sections_html')): ?>
+            <table class="dw-content-table">
+                <?= WebSession::get('dw_sections_sections_html') ?>
+            </table>
+        <?php else: ?>
+            <div class="dw-empty-tab">No sections configured.</div>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>

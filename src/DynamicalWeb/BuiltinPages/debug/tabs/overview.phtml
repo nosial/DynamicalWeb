@@ -1,0 +1,86 @@
+<?php
+    use DynamicalWeb\WebSession;
+?>
+<!-- Overview Tab -->
+<div id="tab-overview" class="dw-tab-content dw-active">
+    <table class="dw-content-table">
+        <tr>
+            <td class="dw-label">Execution Time</td>
+            <td class="dw-value"><?= WebSession::get('dw_formatted_time') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+            <td class="dw-label">Memory Usage</td>
+            <td class="dw-value"><?= WebSession::get('dw_formatted_memory') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+            <td class="dw-label">Peak Memory</td>
+            <td class="dw-value"><?= WebSession::get('dw_formatted_peak') ?><?php if (WebSession::get('dw_peak_mem_pct') !== null): ?> <span style="color:#888;">(<?= WebSession::get('dw_peak_mem_pct') ?>)</span><?php endif; ?></td>
+        </tr>
+        <tr>
+            <td class="dw-label">Memory Limit</td>
+            <td class="dw-value" colspan="5"><?= WebSession::get('dw_formatted_mem_limit') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+        </tr>
+        <tr>
+            <td class="dw-label">Method</td>
+            <td class="dw-value"><?= WebSession::get('dw_request_method') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+            <td class="dw-label">Status</td>
+            <td class="dw-value <?= WebSession::get('dw_status_class') ?>"><?= WebSession::get('dw_status_code') ?> <?= WebSession::get('dw_status_text') ?></td>
+            <td class="dw-label">Content Type</td>
+            <td class="dw-value"><?= WebSession::get('dw_escaped_content_type') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+        </tr>
+        <?php if (WebSession::get('dw_cpu_user') !== null): ?>
+        <tr>
+            <td class="dw-label">CPU User Time</td>
+            <td class="dw-value"><?= WebSession::get('dw_cpu_user') ?></td>
+            <td class="dw-label">CPU System Time</td>
+            <td class="dw-value"><?= WebSession::get('dw_cpu_sys') ?></td>
+            <td class="dw-label"></td>
+            <td class="dw-value"></td>
+        </tr>
+        <?php endif; ?>
+        <tr>
+            <td class="dw-label">Path</td>
+            <td class="dw-value" colspan="5"><?= WebSession::get('dw_request_path') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+        </tr>
+        <tr>
+            <td class="dw-label">Host</td>
+            <td class="dw-value"><?= WebSession::get('dw_request_host') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+            <td class="dw-label">Client IP</td>
+            <td class="dw-value"><?= WebSession::get('dw_client_ip') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+            <td class="dw-label">HTTP Version</td>
+            <td class="dw-value"><?= WebSession::get('dw_http_version') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+        </tr>
+        <tr>
+            <td class="dw-label">Charset</td>
+            <td class="dw-value"><?= WebSession::get('dw_escaped_charset') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+            <td class="dw-label">Secure</td>
+            <td class="dw-value"><?= WebSession::get('dw_is_secure') ?></td>
+            <td class="dw-label">PHP Version</td>
+            <td class="dw-value"><?= WebSession::get('dw_escaped_php_version') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+        </tr>
+        <tr>
+            <td class="dw-label">Request ID</td>
+            <td class="dw-value" colspan="3"><?= WebSession::get('dw_request_id') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+            <td class="dw-label">Language</td>
+            <td class="dw-value"><?= WebSession::get('dw_detected_language') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+        </tr>
+        <tr>
+            <td class="dw-label">Route Pattern</td>
+            <td class="dw-value" colspan="3"><?= WebSession::get('dw_route_path') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+            <td class="dw-label">Locale</td>
+            <td class="dw-value"><?= WebSession::get('dw_route_locale_id') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+        </tr>
+        <tr>
+            <td class="dw-label">Allowed Methods</td>
+            <td class="dw-value"><?= WebSession::get('dw_route_allowed_methods') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+            <td class="dw-label">Uploads</td>
+            <td class="dw-value"><?= WebSession::get('dw_file_count') ?> (<?= WebSession::get('dw_total_file_size') ?>)</td>
+            <td class="dw-label">Resp. Size</td>
+            <td class="dw-value"><?= WebSession::get('dw_response_body_size') ?></td>
+        </tr>
+        <tr>
+            <td class="dw-label">Module</td>
+            <td class="dw-value" colspan="5"><?= WebSession::get('dw_escaped_module') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+        </tr>
+        <tr>
+            <td class="dw-label">Referer</td>
+            <td class="dw-value" colspan="5"><?= WebSession::get('dw_referer') ?: '<span class="dw-value-empty">&mdash;</span>' ?></td>
+        </tr>
+    </table>
+</div>

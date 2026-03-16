@@ -1,0 +1,12 @@
+<?php
+    use DynamicalWeb\WebSession;
+?>
+<!-- Included Files Tab -->
+<div id="tab-included" class="dw-tab-content">
+    <?php if (WebSession::get('dw_php_included_files_html')): ?>
+        <div class="dw-section-divider" style="padding:5px 12px;">PHP Included Files (<?= WebSession::get('dw_php_included_count') ?>)</div>
+        <?= WebSession::get('dw_php_included_files_html') ?>
+    <?php else: ?>
+        <div class="dw-empty-tab">No included files tracked.</div>
+    <?php endif; ?>
+</div>

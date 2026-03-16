@@ -1,0 +1,13 @@
+<?php
+    use DynamicalWeb\WebSession;
+?>
+<!-- Request Tab -->
+<div id="tab-request" class="dw-tab-content">
+    <?php if (WebSession::get('dw_request_sections_html')): ?>
+        <table class="dw-content-table">
+            <?= WebSession::get('dw_request_sections_html') ?>
+        </table>
+    <?php else: ?>
+        <div class="dw-empty-tab">No request details available.</div>
+    <?php endif; ?>
+</div>

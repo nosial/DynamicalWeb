@@ -1,0 +1,29 @@
+<!-- DynamicalWeb Debug Panel -->
+<iframe id="dw-debug-panel-iframe" srcdoc="<?= $escapedContent ?>" style="position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; height: 32px !important; border: none !important; z-index: 2147483647 !important; box-shadow: 0 -2px 8px rgba(0,0,0,0.3) !important;"></iframe>
+<script>
+    (function() {
+        var iframe = document.getElementById('dw-debug-panel-iframe');
+        if (!iframe) return;
+        window.addEventListener('message', function(e) {
+            if (e.data && e.data.type === 'dw-debug-resize') {
+                iframe.style.height = Math.min(Math.max(e.data.height, 32), 500) + 'px';
+            }
+            if (e.data && e.data.type === 'dw-debug-reload') {
+                window.location.reload();
+            }
+            if (e.data && e.data.type === 'dw-debug-set-cookie') {
+                var opts = e.data.opts;
+                if (!opts || !opts.name) return;
+                fetch('/dynaweb/debug/cookie', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(opts)
+                }).then(function() {
+                    window.location.reload();
+                }).catch(function() {
+                    window.location.reload();
+                });
+            }
+        });
+    })();
+</script>

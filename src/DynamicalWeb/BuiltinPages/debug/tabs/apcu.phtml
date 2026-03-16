@@ -1,0 +1,15 @@
+<?php
+    use DynamicalWeb\WebSession;
+?>
+<!-- APCu Tab -->
+<?php if (WebSession::get('dw_has_apcu')): ?>
+    <div id="tab-apcu" class="dw-tab-content">
+        <?php if (WebSession::get('dw_apcu_sections_html')): ?>
+            <table class="dw-content-table">
+                <?= WebSession::get('dw_apcu_sections_html') ?>
+            </table>
+        <?php else: ?>
+            <div class="dw-empty-tab">No APCu information available.</div>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>
