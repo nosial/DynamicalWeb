@@ -6,6 +6,7 @@
 
     class Route implements SerializableInterface
     {
+        private ?string $id;
         private string $path;
         private string $module;
         private ?string $localeId;
@@ -18,6 +19,7 @@
          */
         public function __construct(array $data)
         {
+            $this->id = $data['id'] ?? null;
             $this->path = $data['path'];
             $this->module = $data['module'];
             $this->localeId = $data['locale_id'] ?? null;
@@ -26,6 +28,16 @@
             {
                 $this->allowedMethods = $data['allowed_methods'];
             }
+        }
+
+        /**
+         * Returns the unique ID of the route, if set
+         *
+         * @return string|null The route ID or null if not set
+         */
+        public function getId(): ?string
+        {
+            return $this->id;
         }
 
         /**
@@ -79,6 +91,7 @@
         public function toArray(): array
         {
             $output = [
+                'id' => $this->id,
                 'path' => $this->path,
                 'module' => $this->module,
                 'locale_id' => $this->localeId
