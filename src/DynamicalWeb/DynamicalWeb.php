@@ -12,6 +12,7 @@
     use DynamicalWeb\Exceptions\DynamicalWebException;
     use DynamicalWeb\Exceptions\ExecutionException;
     use DynamicalWeb\Objects\WebConfiguration;
+    use DynamicalWeb\Objects\WebConfiguration\Section;
     use ncc\Runtime;
     use Symfony\Component\Yaml\Yaml;
     use Throwable;
@@ -71,7 +72,7 @@
                     // Only cache when APCu is not disabled by the configuration itself
                     if (!$this->webConfiguration->getApplication()->isApcuDisabled())
                     {
-                        Apcu::store($configCacheKey, $parsedData, 60);
+                        Apcu::store($configCacheKey, $parsedData, $this->webConfiguration->getApplication()->getApcuConfigTtl());
                     }
                 }
             }
@@ -195,7 +196,7 @@
         /**
          * Returns all configured sections from the web configuration.
          *
-         * @return array<string, \DynamicalWeb\Objects\WebConfiguration\Section>
+         * @return array<string, Section>
          */
         public function getSections(): array
         {
@@ -206,9 +207,9 @@
          * Returns a specific section by name, with its module path resolved to an absolute path.
          *
          * @param string $name
-         * @return \DynamicalWeb\Objects\WebConfiguration\Section|null
+         * @return Section|null
          */
-        public function getSection(string $name): ?\DynamicalWeb\Objects\WebConfiguration\Section
+        public function getSection(string $name): ?Section
         {
             return $this->webConfiguration->getSection($name);
         }
@@ -255,10 +256,10 @@
                 DebugPanel::start();
             }
 
-            WebSession::startSession($this);
-
             try
             {
+                WebSession::startSession($this);
+
                 $preRequests = $this->webConfiguration->getApplication()->getPreRequest();
                 if($preRequests !== null && count($preRequests) > 0)
                 {
@@ -272,8 +273,11 @@
                     }
                 }
 
-                WebSession::getResponse()->setHeader('X-Powered-By', 'DynamicalWeb');
-                WebSession::getResponse()->setHeader('X-Request-ID', WebSession::getRequest()->getId());
+                if(!$this->webConfiguration->getApplication()->isDefaultHeadersDisabled())
+                {
+                    WebSession::getResponse()->setHeader('X-Powered-By', 'DynamicalWeb');
+                    WebSession::getResponse()->setHeader('X-Request-ID', WebSession::getRequest()->getId());
+                }
 
                 $modulePath = WebSession::getModule();
                 if($modulePath === null)
@@ -282,7 +286,7 @@
                 }
                 else
                 {
-                    $this->executeModule(WebSession::getModule());
+                    $this->executeModule($modulePath);
                 }
 
 
@@ -302,21 +306,40 @@
             }
             catch (ExecutionException $e)
             {
-                $this->handleErrorResponse($e);
+                $this->safeHandleErrorResponse($e);
             }
             catch (Throwable $e)
             {
-                $this->handleErrorResponse(new ExecutionException('Unexpected error occurred: ' . $e->getMessage(), 0, $e));
+                $this->safeHandleErrorResponse(new ExecutionException('Unexpected error occurred: ' . $e->getMessage(), 0, $e));
             }
             finally
             {
                 // Inject debug panel before sending response if enabled
-                if($this->webConfiguration->getApplication()->isDebugPanelEnabled())
+                try
                 {
-                    DebugPanel::inject(WebSession::getResponse(), WebSession::getRequest(), WebSession::getCurrentRoute());
+                    if($this->webConfiguration->getApplication()->isDebugPanelEnabled() && WebSession::getResponse() !== null)
+                    {
+                        DebugPanel::inject(WebSession::getResponse(), WebSession::getRequest(), WebSession::getCurrentRoute());
+                    }
+                }
+                catch (Throwable)
+                {
+                    // Debug panel injection failed, proceed to send response
                 }
 
-                WebSession::getResponse()->send();
+                try
+                {
+                    $response = WebSession::getResponse();
+                    if ($response !== null)
+                    {
+                        $response->send();
+                    }
+                }
+                catch (Throwable)
+                {
+                    // Response sending failed
+                }
+
                 WebSession::endSession();
             }
         }
@@ -357,15 +380,12 @@
          * Handles serving static files by setting appropriate headers and content type based on the file extension.
          *
          * @param string $filePath The full path to the static file to serve
-         * @param int|null $cacheMaxAge Optional maximum age for caching the response in seconds (default: 3600 seconds)
          */
-        /** Maximum file size (bytes) eligible for APCu content caching. Files larger than this are streamed from disk. */
-        private const APCU_CONTENT_MAX_SIZE = 262144; // 256 KB
-
-        private function handleStaticResponse(string $filePath, ?int $cacheMaxAge=3600): void
+        private function handleStaticResponse(string $filePath): void
         {
             $extension = pathinfo($filePath, PATHINFO_EXTENSION);
             $mimeType  = MimeType::fromExtension($extension);
+            $appConfig = $this->webConfiguration->getApplication();
 
             // Cache filemtime + filesize per file to avoid repeated syscalls across requests
             $metaCacheKey = 'dw_filemeta_' . md5($filePath);
@@ -373,7 +393,7 @@
             if (!$metaHit || !is_array($meta))
             {
                 $meta = ['mtime' => filemtime($filePath), 'size' => filesize($filePath)];
-                Apcu::store($metaCacheKey, $meta, 10);
+                Apcu::store($metaCacheKey, $meta, $appConfig->getApcuMetaTtl());
             }
 
             $lastModified = $meta['mtime'];
@@ -382,7 +402,8 @@
             WebSession::getResponse()->setHeader('Content-Length', (string) $meta['size']);
             WebSession::getResponse()->setHeader('Last-Modified', gmdate('D, d M Y H:i:s', $lastModified) . ' GMT');
 
-            if($cacheMaxAge !== null && $cacheMaxAge > 0)
+            $cacheMaxAge = $appConfig->getStaticCacheMaxAge();
+            if($cacheMaxAge > 0)
             {
                 WebSession::getResponse()->setHeader('Cache-Control', 'public, max-age=' . $cacheMaxAge);
             }
@@ -390,7 +411,7 @@
             if (isset($_SERVER['HTTP_IF_MODIFIED_SINCE']))
             {
                 $ifModifiedSince = strtotime($_SERVER['HTTP_IF_MODIFIED_SINCE']);
-                if ($ifModifiedSince >= $lastModified)
+                if ($ifModifiedSince !== false && $ifModifiedSince >= $lastModified)
                 {
                     WebSession::getResponse()->setStatusCode(ResponseCode::NOT_MODIFIED);
                     return;
@@ -399,7 +420,7 @@
 
             // For small files, serve content from APCu cache to avoid disk I/O on every request.
             // Entries are stored with the file's mtime; a mtime mismatch invalidates the cached content.
-            if ($meta['size'] <= self::APCU_CONTENT_MAX_SIZE)
+            if ($meta['size'] <= $appConfig->getApcuContentMaxSize())
             {
                 $contentCacheKey = 'dw_filecontent_' . md5($filePath);
                 $cached = Apcu::fetch($contentCacheKey, $contentHit);
@@ -413,7 +434,7 @@
                 $content = file_get_contents($filePath);
                 if ($content !== false)
                 {
-                    Apcu::store($contentCacheKey, ['mtime' => $lastModified, 'content' => $content], 3600);
+                    Apcu::store($contentCacheKey, ['mtime' => $lastModified, 'content' => $content], $appConfig->getApcuContentTtl());
                     WebSession::getResponse()->setBody($content);
                     return;
                 }
@@ -496,6 +517,63 @@
         }
 
         /**
+         * Safely handles an error response with multiple fallback layers. Ensures a Response object
+         * exists before attempting error handling, and falls back to raw PHP output if all else fails.
+         *
+         * @param ExecutionException $e The exception that triggered the error response
+         */
+        private function safeHandleErrorResponse(ExecutionException $e): void
+        {
+            WebSession::ensureResponse();
+
+            try
+            {
+                $this->handleErrorResponse($e);
+            }
+            catch (Throwable)
+            {
+                // handleErrorResponse itself failed — set a minimal 500 response
+                try
+                {
+                    WebSession::getResponse()->setStatusCode(ResponseCode::INTERNAL_SERVER_ERROR);
+                    WebSession::getResponse()->setContentType(MimeType::TEXT);
+
+                    if ($this->webConfiguration->getApplication()->errorReportingEnabled())
+                    {
+                        $errorMessage = "500 Internal Server Error\n\n";
+                        $errorMessage .= $e->getMessage() . "\n\n";
+                        if ($e->getPrevious() !== null)
+                        {
+                            $errorMessage .= "Caused by: " . $e->getPrevious()->getMessage() . "\n";
+                            $errorMessage .= $e->getPrevious()->getTraceAsString();
+                        }
+                        else
+                        {
+                            $errorMessage .= $e->getTraceAsString();
+                        }
+
+                        WebSession::getResponse()->setBody($errorMessage);
+                    }
+                    else
+                    {
+                        WebSession::getResponse()->setBody('500 Internal Server Error');
+                    }
+                }
+                catch (Throwable)
+                {
+                    // Absolute last resort — direct PHP output
+                    if (!headers_sent())
+                    {
+                        http_response_code(500);
+                        header('Content-Type: text/plain');
+                    }
+
+                    echo '500 Internal Server Error';
+                }
+            }
+        }
+
+        /**
          * Handles a 404 Not Found response by attempting to use a custom error handler if configured, and falling back
          * to a default error message if not.
          */
@@ -542,5 +620,15 @@
             WebSession::getResponse()->setStatusCode(ResponseCode::NOT_FOUND);
             WebSession::getResponse()->setContentType(MimeType::TEXT);
             WebSession::getResponse()->setBody('404 Not Found');
+        }
+
+        /**
+         * Retrieves the version of the DynamicalWeb package from the runtime.
+         *
+         * @return string The version string of the DynamicalWeb package, or 'unknown' if it cannot be determined
+         */
+        public static function getVersion(): string
+        {
+            return Runtime::getImportedPackage('net.nosial.dynamicalweb')?->getAssembly()->getVersion() ?? 'unknown';
         }
     }
