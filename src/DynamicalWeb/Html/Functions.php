@@ -6,6 +6,7 @@
     use DynamicalWeb\Classes\ExecutionHandler;
     use DynamicalWeb\Exceptions\ExecutionException;
     use DynamicalWeb\Exceptions\LocaleException;
+    use DynamicalWeb\Exceptions\RouterException;
     use DynamicalWeb\Exceptions\SectionException;
     use DynamicalWeb\Interfaces\StringInterface;
     use DynamicalWeb\WebSession;
@@ -67,6 +68,57 @@
             }
 
             self::print($string, $escape);
+        }
+
+        /**
+         * Generates and prints a fully-qualified URL for a named route.
+         *
+         * Resolves the route by its ID, builds the URL from the automatically detected
+         * base URL (scheme + host from the current request) and base_path, substitutes
+         * any {variable} placeholders in the route path with values from $pathVariables,
+         * and appends optional GET query parameters.
+         *
+         * @param string $id           The route ID as defined in the web configuration.
+         * @param array  $pathVariables Associative array of path variable substitutions (e.g. ['id' => '42']).
+         * @param array  $queryParams   Associative array of query string parameters to append (e.g. ['page' => '2']).
+         * @throws RouterException If no web session is active or the route ID is not found.
+         */
+        public static function printRoute(string $id, array $pathVariables = [], array $queryParams = []): void
+        {
+            $instance = WebSession::getInstance();
+            if ($instance === null)
+            {
+                throw new RouterException(sprintf('Cannot resolve route "%s": no active web session', $id));
+            }
+
+            $router = $instance->getWebConfiguration()->getRouter();
+            $route  = $router->getRouteById($id);
+
+            if ($route === null)
+            {
+                throw new RouterException(sprintf('Route with ID "%s" is not defined in the web configuration', $id));
+            }
+
+            // Auto-detect the base URL from the current request's scheme and host
+            $request  = WebSession::getRequest();
+            $baseUrl  = ($request->isSecure() ? 'https' : 'http') . '://' . rtrim($request->getHost(), '/');
+            $basePath = rtrim($router->getBasePath(), '/');
+            $path     = $route->getPath();
+
+            // Substitute {variable} placeholders with provided values
+            foreach ($pathVariables as $key => $value)
+            {
+                $path = str_replace('{' . $key . '}', rawurlencode((string) $value), $path);
+            }
+
+            $url = $baseUrl . $basePath . $path;
+
+            if (!empty($queryParams))
+            {
+                $url .= '?' . http_build_query($queryParams);
+            }
+
+            print($url);
         }
 
         /**
