@@ -1,0 +1,29 @@
+source: src
+default_build: release
+update_source: nosial/dynamicalweb@n64
+repository:
+  name: n64
+  type: github
+  host: github.com
+  ssl: true
+assembly:
+  name: DynamicalWeb
+  package: net.nosial.dynamicalweb
+  version: 1.0.0
+  description: DynamicalWeb is a PHP framework for building web applications using ncc
+  license: MIT
+  url: https://git.n64.cc/nosial/DynamicalWeb
+dependencies:
+  net.nosial.loglib2: nosial/loglib2@github
+  com.symfony.yaml: symfony/yaml@packagist
+build_configurations:
+  -
+    name: debug
+    output: 'target/debug/${ASSEMBLY.PACKAGE}.ncc'
+    type: ncc
+    definitions:
+      NCC_DEBUG: true
+  -
+    name: release
+    output: 'target/release/${ASSEMBLY.PACKAGE}.ncc'
+    type: ncc
