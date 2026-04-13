@@ -18,6 +18,7 @@
     use DynamicalWeb\Classes\DebugPanel\SectionsTabBuilder;
     use DynamicalWeb\Classes\DebugPanel\ServerTabBuilder;
     use DynamicalWeb\Classes\DebugPanel\SessionTabBuilder;
+    use DynamicalWeb\Abstract\AbstractTabBuilder;
     use DynamicalWeb\Enums\PathConstants;
     use DynamicalWeb\Objects\Request;
     use DynamicalWeb\Objects\Response;
@@ -167,7 +168,7 @@
                     'dw_executed_files_html'      => ProfilerTabBuilder::build(),
                     'dw_php_included_files_html'   => ProfilerTabBuilder::buildIncluded($includedFiles),
                     'dw_php_included_count'       => count($includedFiles),
-                    'dw_response_body_size'       => self::formatBytes(strlen($response->getBody())),
+                    'dw_response_body_size'       => AbstractTabBuilder::formatBytes(strlen($response->getBody())),
                 ]
             );
 
@@ -215,9 +216,9 @@
 
             return [
                 'dw_formatted_time'    => self::formatTime($executionTime),
-                'dw_formatted_memory'  => self::formatBytes($memoryUsage),
-                'dw_formatted_peak'    => self::formatBytes($peakBytes),
-                'dw_formatted_mem_limit'=> $memLimitBytes === -1 ? 'Unlimited' : self::formatBytes($memLimitBytes),
+                'dw_formatted_memory'  => AbstractTabBuilder::formatBytes($memoryUsage),
+                'dw_formatted_peak'    => AbstractTabBuilder::formatBytes($peakBytes),
+                'dw_formatted_mem_limit'=> $memLimitBytes === -1 ? 'Unlimited' : AbstractTabBuilder::formatBytes($memLimitBytes),
                 'dw_peak_mem_pct'       => $peakPct !== null ? $peakPct . '%' : null,
                 'dw_cpu_user'          => $cpuUser !== null ? self::formatTime($cpuUser / 1_000_000) : null,
                 'dw_cpu_sys'           => $cpuSys  !== null ? self::formatTime($cpuSys  / 1_000_000) : null,
@@ -261,7 +262,7 @@
                 'dw_http_version'     => $request ? $request->getHttpVersion() : 'N/A',
                 'dw_detected_language'=> $request ? ($request->getDetectedLanguage() ?? 'N/A') : 'N/A',
                 'dw_file_count'       => $request ? $request->getFileCount() : 0,
-                'dw_total_file_size'   => $request ? self::formatBytes($request->getTotalFileSize()) : '0 B',
+                'dw_total_file_size'   => $request ? AbstractTabBuilder::formatBytes($request->getTotalFileSize()) : '0 B',
                 'dw_headers_count'    => $request ? count($request->getHeaders()) : 0,
                 'dw_query_count'      => $request ? count($request->getQueryParameters()) : 0,
                 'dw_body_count'       => $request ? count($request->getBodyParameters()) : 0,
@@ -513,20 +514,6 @@
             return number_format($seconds, 3) . ' s';
         }
 
-        /**
-         * Formats a byte count into a human-readable string with appropriate units (B, KB, MB, GB, TB)
-         *
-         * @param int $bytes The number of bytes
-         * @return string The formatted byte size string with units
-         */
-        private static function formatBytes(int $bytes): string
-        {
-            $units = ['B', 'KB', 'MB', 'GB', 'TB'];
-            $bytes = max($bytes, 0);
-            $pow   = min((int) floor($bytes ? log($bytes) / log(1024) : 0), count($units) - 1);
-
-            return round($bytes / (1 << (10 * $pow)), 2) . ' ' . $units[$pow];
-        }
 
         /**
          * Determines the CSS class for the response status code to visually indicate success, warning, or error

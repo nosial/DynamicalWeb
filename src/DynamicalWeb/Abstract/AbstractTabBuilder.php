@@ -43,7 +43,7 @@
             return number_format($seconds, 3) . ' s';
         }
 
-        protected static function formatBytes(int $bytes): string
+        public static function formatBytes(int $bytes): string
         {
             $units = ['B', 'KB', 'MB', 'GB', 'TB'];
             $bytes = max($bytes, 0);
