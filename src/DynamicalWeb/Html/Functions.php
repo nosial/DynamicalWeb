@@ -54,9 +54,41 @@
 
             // Section context takes priority; fall back to the current route's locale_id
             $localeId = self::$activeLocaleSection ?? WebSession::getCurrentRoute()?->getLocaleId();
+
             if ($localeId === null)
             {
-                throw new RuntimeException('No active locale section is set for the current execution context');
+                // Fallback: try to find any section with a locale_id from the configuration
+                $instance = WebSession::getInstance();
+                if ($instance !== null)
+                {
+                    $sections = $instance->getSections();
+                    foreach ($sections as $section)
+                    {
+                        $sid = $section->getLocaleId();
+                        if ($sid !== null)
+                        {
+                            $localeId = $sid;
+                            break;
+                        }
+                    }
+                }
+
+                // Fallback: use the first available locale section from the locale data
+                if ($localeId === null)
+                {
+                    $localeIds = $currentLocale->getLocaleIds();
+                    if (!empty($localeIds))
+                    {
+                        $localeId = $localeIds[0];
+                    }
+                }
+
+                // Last resort: print the key as-is instead of throwing
+                if ($localeId === null)
+                {
+                    self::print($id, $escape);
+                    return;
+                }
             }
 
             $string = $currentLocale->getString($localeId, (string)$id, $locale);
