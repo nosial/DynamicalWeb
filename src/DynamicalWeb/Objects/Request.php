@@ -52,7 +52,13 @@
             $this->isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
                 || ($_SERVER['SERVER_PORT'] ?? 80) == 443
                 || (strtolower($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
-            $this->host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
+            $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
+            $port = (int)($_SERVER['SERVER_PORT'] ?? 80);
+            if (!str_contains($host, ':') && $port !== ($this->isSecure ? 443 : 80))
+            {
+                $host .= ':' . $port;
+            }
+            $this->host = $host;
             $this->httpVersion = str_replace('HTTP/', '', ($_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.1'));
             $this->path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
             $this->url = ($this->isSecure ? 'https' : 'http') . '://' . $this->host . ($_SERVER['REQUEST_URI'] ?? '/');

@@ -96,7 +96,7 @@
                 throw new RuntimeException(sprintf('Route with ID "%s" is not defined in the web configuration', $id));
             }
 
-            // Auto-detect the base URL from the current request's scheme and host
+            // Auto-detect the base URL from the current request's scheme, host and port
             $request  = WebSession::getRequest();
             $baseUrl  = ($request->isSecure() ? 'https' : 'http') . '://' . rtrim($request->getHost(), '/');
             $basePath = rtrim($router->getBasePath(), '/');
