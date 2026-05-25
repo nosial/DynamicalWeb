@@ -5,6 +5,7 @@
     use DynamicalWeb\Classes\Apcu;
     use DynamicalWeb\Classes\DebugPanel;
     use DynamicalWeb\Classes\ExecutionHandler;
+    use DynamicalWeb\Classes\Logger;
     use DynamicalWeb\Classes\PathResolver;
     use DynamicalWeb\Enums\MimeType;
     use DynamicalWeb\Enums\PathConstants;
@@ -461,6 +462,7 @@
         private function handleErrorResponse(ExecutionException $e): void
         {
             WebSession::setException($e);
+            Logger::getLogger()->error('Unhandled exception', $e);
             $errorHandler = $this->webConfiguration->getRouter()->getResponseHandler(ResponseCode::INTERNAL_SERVER_ERROR);
             if ($errorHandler !== null)
             {
