@@ -19,6 +19,7 @@ This update introduces quality of life improvements
 
 ### Removed
 - Removed section configuration from the main configuration file, as it is no longer necessary
+- Removed dead setCompleted from Response
 
 
 ## [1.0.3] - 2026-05-25

@@ -444,12 +444,4 @@
             $response = new Response();
             $this->assertFalse($response->isCompleted());
         }
-
-        public function testSetCompletedMarksResponseAsCompleted(): void
-        {
-            $response = new Response();
-            $result = $response->setCompleted();
-            $this->assertTrue($response->isCompleted());
-            $this->assertSame($response, $result);
-        }
     }

@@ -59,19 +59,6 @@
         }
 
         /**
-         * Marks the response as completed, signalling that the request pipeline should skip
-         * any remaining pre-request scripts and module execution. Typically called from
-         * pre-request scripts that have fully handled the response (e.g. authentication failures).
-         *
-         * @return self Returns the Response object for method chaining.
-         */
-        public function setCompleted(): self
-        {
-            $this->completed = true;
-            return $this;
-        }
-
-        /**
          * Returns the HTTP status code of the response.
          *
          * @return ResponseCode The HTTP status code of the response.
