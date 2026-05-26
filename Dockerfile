@@ -30,14 +30,14 @@ RUN git clone --recurse-submodules "https://github.com/nosial/WebsocketServer" .
 
 
 # Build DynamicalWeb NCC Package
-FROM ghcr.io/nosial/ncc:dev AS dw-builder
+FROM ghcr.io/nosial/ncc:latest AS dw-builder
 
 WORKDIR /tmp/dw
 COPY . .
 RUN ncc build --configuration release
 
 # Production Image
-FROM ghcr.io/nosial/ncc:dev-fpm
+FROM ghcr.io/nosial/ncc:fpm
 
 ARG PHP_VERSION
 LABEL maintainer="Netkas <netkas@nosial.net>"
