@@ -18,7 +18,7 @@
 #   COPY index.php /var/www/html/index.php
 #
 
-ARG PHP_VERSION=8.3
+ARG PHP_VERSION=8.5
 
 # Build DynamicalWeb NCC Package
 FROM ghcr.io/nosial/ncc:latest AS dw-builder

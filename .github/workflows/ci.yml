@@ -12,7 +12,7 @@ jobs:
   debug:
     runs-on: ubuntu-latest
     container:
-      image: php:8.3
+      image: php:8.5
 
     steps:
       - name: Checkout repository
@@ -50,7 +50,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     container:
-      image: php:8.3
+      image: php:8.5
 
     steps:
       - name: Checkout repository
@@ -124,7 +124,7 @@ jobs:
     needs: [debug, release, check-phpunit]
     runs-on: ubuntu-latest
     container:
-      image: php:8.3
+      image: php:8.5
     if: needs.check-phpunit.outputs.phpunit-exists == 'true'
 
     steps:
@@ -176,7 +176,7 @@ jobs:
     permissions: write-all
     runs-on: ubuntu-latest
     container:
-      image: php:8.3
+      image: php:8.5
     if: github.event_name == 'release'
 
     steps:
