@@ -57,30 +57,11 @@
 
             if ($localeId === null)
             {
-                // Fallback: try to find any section with a locale_id from the configuration
-                $instance = WebSession::getInstance();
-                if ($instance !== null)
-                {
-                    $sections = $instance->getSections();
-                    foreach ($sections as $section)
-                    {
-                        $sid = $section->getLocaleId();
-                        if ($sid !== null)
-                        {
-                            $localeId = $sid;
-                            break;
-                        }
-                    }
-                }
-
                 // Fallback: use the first available locale section from the locale data
-                if ($localeId === null)
+                $localeIds = $currentLocale->getLocaleIds();
+                if (!empty($localeIds))
                 {
-                    $localeIds = $currentLocale->getLocaleIds();
-                    if (!empty($localeIds))
-                    {
-                        $localeId = $localeIds[0];
-                    }
+                    $localeId = $localeIds[0];
                 }
 
                 // Last resort: print the key as-is instead of throwing
@@ -151,44 +132,42 @@
         }
 
         /**
-         * Renders a named section (a reusable .phtml fragment) and outputs its content.
+         * Renders a PHTML section file and outputs its content.
          *
-         * The section's locale_id (if configured) overrides the current route's locale_id for
-         * the duration of the section's rendering, so printl() calls inside the section
-         * resolve strings from the section's own locale scope without conflict.
+         * The section can call loadLocalization() to set its own locale scope,
+         * which will be automatically restored after the section finishes rendering.
          *
-         * @param string $name The section name as defined under `sections:` in the web configuration.
-         * @throws RuntimeException If executing the section throws an error or if the section is not configured or its
-         *                          module file is not found
+         * @param string $path The absolute path to the PHTML section file.
+         * @throws RuntimeException If executing the section throws an error or if the file is not found
          */
-        public static function insertSection(string $name): void
+        public static function insertSection(string $path, ?string $localizationId = null): void
         {
-            $instance = WebSession::getInstance();
-            if ($instance === null)
+            // Resolve relative paths against the calling file's directory
+            if (strlen($path) > 0 && $path[0] !== '/' && $path[0] !== '\\')
             {
-                throw new RuntimeException(sprintf('Cannot insert section "%s": no active web session', $name));
+                $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+                if (isset($trace[1]['file']))
+                {
+                    $path = dirname($trace[1]['file']) . DIRECTORY_SEPARATOR . $path;
+                }
             }
 
-            $section = $instance->getSection($name);
-            if ($section === null)
+            if (!file_exists($path))
             {
-                throw new RuntimeException(sprintf('Section "%s" is not defined in the web configuration', $name));
+                throw new RuntimeException(sprintf('Section file not found at "%s"', $path));
             }
 
-            $modulePath = $instance->getSectionModulePath($name);
-            if ($modulePath === null || !file_exists($modulePath))
-            {
-                throw new RuntimeException(sprintf('Module file for section "%s" not found at "%s"', $name, $modulePath ?? 'unknown'));
-            }
-
-            // Push this section's locale_id onto the context stack; restore after execution
             $previous  = self::$activeLocaleSection;
             $startTime = microtime(true);
-            self::$activeLocaleSection = $section->getLocaleId();
+
+            if ($localizationId !== null)
+            {
+                self::$activeLocaleSection = $localizationId;
+            }
 
             try
             {
-                print(ExecutionHandler::executePhtml($modulePath));
+                print(ExecutionHandler::executePhtml($path));
             }
             catch (ExecutionException $e)
             {
@@ -198,8 +177,21 @@
             {
                 $duration = microtime(true) - $startTime;
                 self::$activeLocaleSection = $previous;
-                DebugPanel::trackSectionExecution($name, $duration);
+                DebugPanel::trackSectionExecution($path, $duration);
             }
+        }
+
+        /**
+         * Sets the active locale context for subsequent printl() calls.
+         *
+         * Call this at the beginning of a section template to make printl()
+         * resolve strings from the given locale section ID.
+         *
+         * @param string $name The locale section ID (e.g., "navbar").
+         */
+        public static function loadLocalization(string $name): void
+        {
+            self::$activeLocaleSection = $name;
         }
     }
 
