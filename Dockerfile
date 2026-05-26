@@ -20,15 +20,6 @@
 
 ARG PHP_VERSION=8.3
 
-# Build WebsocketServer
-FROM rust:latest AS wss-builder
-
-WORKDIR /tmp/wss
-RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
-RUN git clone --recurse-submodules "https://github.com/nosial/WebsocketServer" . && \
-    cargo build --release && cp target/release/websocket-server /usr/bin/wss
-
-
 # Build DynamicalWeb NCC Package
 FROM ghcr.io/nosial/ncc:latest AS dw-builder
 
@@ -48,11 +39,12 @@ LABEL org.opencontainers.image.url="https://github.com/nosial/DynamicalWeb"
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL ncc.package="net.nosial.dynamicalweb"
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends nginx supervisor && rm -rf /var/lib/apt/lists/*
+# Install runtime dependencies and
+RUN apt update && apt install -y --no-install-recommends nginx supervisor ca-certificates curl && rm -rf /var/lib/apt/lists/*
 
-# Copy WebsocketServer binary
-COPY --from=wss-builder /usr/bin/wss /usr/bin/wss
+# download pre-built WebsocketServer binary
+RUN curl -sL "https://github.com/nosial/WebsocketServer/releases/latest/download/websocket-server" -o /usr/bin/wss && \
+    chmod +x /usr/bin/wss && apt purge -y --auto-remove curl 
 
 # Install DynamicalWeb ncc package
 COPY --from=dw-builder /tmp/dw/target/release/net.nosial.dynamicalweb.ncc /tmp/dw.ncc
