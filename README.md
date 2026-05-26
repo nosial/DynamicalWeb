@@ -157,10 +157,6 @@ build_configurations:
           en: "ExampleBootstrap/WebLocale/en.yml"
           cn: "ExampleBootstrap/WebLocale/cn.yml"
           jp: "ExampleBootstrap/WebLocale/jp.yml"
-        sections:
-          navbar:
-            module: "sections/navbar.phtml"
-            locale_id: "navbar"
         router:
           base_path: "/"
           response_handlers:
@@ -251,10 +247,6 @@ locales:
   en: "ExampleBootstrap/WebLocale/en.yml"
   cn: "ExampleBootstrap/WebLocale/cn.yml"
   jp: "ExampleBootstrap/WebLocale/jp.yml"
-sections:
-  navbar:
-    module: "sections/navbar.phtml"
-    locale_id: "navbar"
 router:
   base_path: "/"
   response_handlers:
@@ -384,32 +376,20 @@ cookie is cleared.
 
 ### Sections Section
 
-Sections in DynamicalWeb are used to define reusable modules that can be included in multiple pages, for example a
-navbar section can be defined, or even headers and footers, these sections can also be localized by setting the
-`locale_id` property to a valid locale ID, for example:
+Sections in DynamicalWeb are reusable `.phtml` fragments that can be included in any template (e.g., navbars,
+headers, footers, sidebars). Sections are not defined in the YAML configuration — they are included directly
+in templates by calling `Functions::insertSection()` with a file path.
 
-```yaml
-sections:
-  navbar:
-    module: "sections/navbar.phtml"
-    locale_id: "navbar"
-  footer:
-    module: "sections/footer.phtml"
-    locale_id: "footer"
+A section template file may look like this:
+
+```phtml
+<!-- sections/navbar.phtml -->
+<?php \DynamicalWeb\Html\Functions::loadLocalization('navbar'); ?>
+<nav>
+    <a href="/"><?php \DynamicalWeb\Html\Functions::printl('brand'); ?></a>
+    <a href="/about"><?php \DynamicalWeb\Html\Functions::printl('about_link'); ?></a>
+</nav>
 ```
-
-When a section is inserted into a page using `Functions::insertSection('navbar')`, DynamicalWeb will automatically
-switch the active locale context to the section's `locale_id` for the duration of the section's rendering, this means
-that any `Functions::printl()` calls inside the section will resolve strings from the section's own locale scope
-without conflicting with the page's locale scope. Once the section finishes rendering, the previous locale context
-is restored.
-
-A section configuration has the following properties:
-
-| Name        | Required | Example                 | Type     | Description                                                                                            |
-|-------------|----------|-------------------------|----------|--------------------------------------------------------------------------------------------------------|
-| `module`    | Yes      | "sections/navbar.phtml" | `string` | The path to the `.phtml` file for this section, based from the `root` directory                        |
-| `locale_id` | No       | "navbar"                | `string` | The locale section ID to use when rendering, this maps to a key in your locale Yaml file               |
 
 
 ### Router Section
@@ -888,8 +868,9 @@ objects that define a `toString()` method directly.
 
 ### Printing Locale Strings
 
-The `Functions::printl()` method prints a localized string from the current locale, it uses the active locale section
-which is determined by the current route's `locale_id` or the section's `locale_id` if called from within a section:
+The `Functions::printl()` method prints a localized string from the current locale, it resolves the active locale
+scope from the current route's `locale_id`, or from the localization context set by `insertSection()` or
+`loadLocalization()` when called from within a section:
 
 ```phtml
 <?php use DynamicalWeb\Html\Functions; ?>
@@ -938,30 +919,54 @@ any `{variable}` placeholders in the route path with the provided values, and ap
 
 ### Inserting Sections
 
-The `Functions::insertSection()` method renders a named section (a reusable `.phtml` fragment) and outputs its content
-inline. Sections are useful for shared components like navigation bars, headers, footers, and sidebars:
+The `Functions::insertSection()` method renders a `.phtml` section file and outputs its content inline. It accepts
+a file path (absolute or relative to the calling file) and an optional `$localizationId` parameter:
+
+```php
+\DynamicalWeb\Html\Functions::insertSection(string $path, ?string $localizationId = null): void
+```
+
+When a `$localizationId` is provided, DynamicalWeb switches the active locale context to that ID for the duration
+of the section's rendering, so `printl()` calls inside the section resolve strings from the section's own locale
+scope. The previous context is restored automatically when the section finishes.
+
+Sections can also set their own locale scope from within the template file by calling `loadLocalization()`:
+
+```php
+\DynamicalWeb\Html\Functions::loadLocalization(string $name): void
+```
+
+Example usage in a parent template:
 
 ```phtml
 <?php use DynamicalWeb\Html\Functions; ?>
 
 <html>
 <body>
-    <?php Functions::insertSection('navbar'); ?>
+    <?php Functions::insertSection('sections/navbar.phtml', 'navbar'); ?>
     
     <main>
         <h1><?php Functions::printl('page_title'); ?></h1>
         <p>Page content here...</p>
     </main>
     
-    <?php Functions::insertSection('footer'); ?>
+    <?php Functions::insertSection('sections/footer.phtml'); ?>
 </body>
 </html>
 ```
 
-When a section is inserted, DynamicalWeb automatically switches the active locale context to the section's
-configured `locale_id`, this means `printl()` calls inside the section's `.phtml` file resolve strings from
-the section's own locale scope. Once the section finishes rendering, the previous locale context is restored,
-so the page's own `printl()` calls continue to work as expected.
+Example section template (`sections/navbar.phtml`):
+
+```phtml
+<?php \DynamicalWeb\Html\Functions::loadLocalization('navbar'); ?>
+<nav>
+    <a href="/"><?php \DynamicalWeb\Html\Functions::printl('brand'); ?></a>
+    <a href="/about"><?php \DynamicalWeb\Html\Functions::printl('about_link'); ?></a>
+</nav>
+```
+
+Relative paths are resolved against the directory of the file that calls `insertSection()`. Absolute paths
+(starting with `/`) are used as-is.
 
 
 ## WebSession
@@ -1195,7 +1200,8 @@ method.
 ### Locale Files
 
 Locale files are Yaml files that contain key-value pairs organized by section, the section names correspond to
-the `locale_id` values configured on routes and sections:
+the `locale_id` values configured on routes, or the `$localizationId` parameter passed to `insertSection()` /
+`loadLocalization()`:
 
 ```yaml
 # en.yml
@@ -1260,7 +1266,8 @@ When a request comes in, DynamicalWeb determines which locale to use based on th
 ### Using Locales in Templates
 
 Locale strings are accessed in templates using the `Functions::printl()` method, this method uses the active
-locale section (determined by the route's or section's `locale_id`) to look up the translation key:
+locale context (determined by the route's `locale_id`, the `$localizationId` passed to `insertSection()`, or
+`loadLocalization()` within a section) to look up the translation key:
 
 ```phtml
 <?php use DynamicalWeb\Html\Functions; ?>
@@ -1436,7 +1443,7 @@ The debug panel includes the following tabs of information:
 | Constants  | PHP constants and their values                                                                       |
 | Session    | PHP session data                                                                                     |
 | Routes     | All configured routes with their paths, modules and allowed methods                                  |
-| Sections   | All configured sections with their modules and locale IDs                                            |
+| Sections   | All configured sections and their execution details                                                  |
 | INI        | PHP INI directives and their values                                                                  |
 | APCu       | APCu cache information including memory usage and cache entries                                      |
 | Locale     | Current locale code, available locales, and a locale switcher                                        |
