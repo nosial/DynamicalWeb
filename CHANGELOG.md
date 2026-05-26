@@ -12,6 +12,7 @@ This update introduces quality of life improvements
 ### Added
  - Added localizationId parameter to insertSection method, allowing for easier localization of sections
  - Added loadLocalization method in Functions class to allow sections to load localization sections during execution
+ - Added Docker build based off the ncc image builds
 
 ### Changed
  - insertSection now accepts a path instead of a section name
