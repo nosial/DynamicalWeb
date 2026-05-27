@@ -42,7 +42,7 @@ LABEL ncc.package="net.nosial.dynamicalweb"
 # Install runtime dependencies and extensions
 RUN apt update && apt install -y --no-install-recommends nginx supervisor ca-certificates curl && rm -rf /var/lib/apt/lists/*
 RUN install-php-extensions apcu sockets \
-    && echo "apc.enable_cli=1" >> /usr/local/etc/php/conf.d/docker-php-ext-apcu.ini \
+    && echo "apc.enable_cli=1" >> /usr/local/etc/php/conf.d/docker-php-ext-apcu.ini
 
 # download pre-built WebsocketServer binary
 RUN curl -sL "https://github.com/nosial/WebsocketServer/releases/latest/download/websocket-server" -o /usr/bin/wss && \
