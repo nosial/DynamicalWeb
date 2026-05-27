@@ -201,25 +201,6 @@
                 $length = $this->maxPayloadSize;
             }
 
-            // Use stream_select to wait for data instead of relying on the short
-            // fread timeout, which would return null after 50ms on an idle socket.
-            $read = [$this->socket];
-            $write = null;
-            $except = null;
-            $result = @stream_select($read, $write, $except, $this->readTimeoutSec, $this->readTimeoutUsec);
-
-            if ($result === false)
-            {
-                $this->connected = false;
-                return null;
-            }
-
-            if ($result === 0)
-            {
-                // Timeout, no data available — return null to signal idle
-                return null;
-            }
-
             $data = @fread($this->socket, $length);
 
             if ($data === false || $data === '')
@@ -454,7 +435,7 @@
                 return false;
             }
 
-            if ($metadata['timed_out'] || feof($this->socket))
+            if (feof($this->socket))
             {
                 $this->connected = false;
                 return false;
