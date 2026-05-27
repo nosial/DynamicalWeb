@@ -62,7 +62,6 @@ COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Copy default application files
 COPY index.php /var/www/html/index.php
-COPY websocket.php /var/www/html/websocket.php
 
 # Copy and configure entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/

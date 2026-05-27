@@ -261,6 +261,12 @@
             {
                 WebSession::startSession($this);
 
+                if (getenv('WSS_ENABLED') === '1')
+                {
+                    $this->handleWebSocketRequest();
+                    return;
+                }
+
                 $preRequests = $this->webConfiguration->getApplication()->getPreRequest();
                 if($preRequests !== null && count($preRequests) > 0)
                 {
@@ -271,31 +277,23 @@
                         {
                             ExecutionHandler::executePhp($preRequestModulePath);
                         }
-
-                        if(WebSession::getResponse()->isCompleted())
-                        {
-                            break;
-                        }
                     }
                 }
 
-                if(!WebSession::getResponse()->isCompleted())
+                if(!$this->webConfiguration->getApplication()->isDefaultHeadersDisabled())
                 {
-                    if(!$this->webConfiguration->getApplication()->isDefaultHeadersDisabled())
-                    {
-                        WebSession::getResponse()->setHeader('X-Powered-By', 'DynamicalWeb');
-                        WebSession::getResponse()->setHeader('X-Request-ID', WebSession::getRequest()->getId());
-                    }
+                    WebSession::getResponse()->setHeader('X-Powered-By', 'DynamicalWeb');
+                    WebSession::getResponse()->setHeader('X-Request-ID', WebSession::getRequest()->getId());
+                }
 
-                    $modulePath = WebSession::getModule();
-                    if($modulePath === null)
-                    {
-                        $this->handleNotFoundResponse();
-                    }
-                    else
-                    {
-                        $this->executeModule($modulePath);
-                    }
+                $modulePath = WebSession::getModule();
+                if($modulePath === null)
+                {
+                    $this->handleNotFoundResponse();
+                }
+                else
+                {
+                    $this->executeModule($modulePath);
                 }
 
 
@@ -323,33 +321,96 @@
             }
             finally
             {
-                // Inject debug panel before sending response if enabled
-                try
-                {
-                    if($this->webConfiguration->getApplication()->isDebugPanelEnabled() && WebSession::getResponse() !== null)
-                    {
-                        DebugPanel::inject(WebSession::getResponse(), WebSession::getRequest(), WebSession::getCurrentRoute());
-                    }
-                }
-                catch (Throwable)
-                {
-                    // Debug panel injection failed, proceed to send response
-                }
+                $isWebSocket = getenv('WSS_ENABLED') === '1';
 
-                try
+                if (!$isWebSocket)
                 {
-                    $response = WebSession::getResponse();
-                    if ($response !== null)
+                    // Inject debug panel before sending response if enabled
+                    try
                     {
-                        $response->send();
+                        if($this->webConfiguration->getApplication()->isDebugPanelEnabled() && WebSession::getResponse() !== null)
+                        {
+                            DebugPanel::inject(WebSession::getResponse(), WebSession::getRequest(), WebSession::getCurrentRoute());
+                        }
                     }
-                }
-                catch (Throwable)
-                {
-                    // Response sending failed
+                    catch (Throwable)
+                    {
+                        // Debug panel injection failed, proceed to send response
+                    }
+
+                    try
+                    {
+                        $response = WebSession::getResponse();
+                        if ($response !== null)
+                        {
+                            $response->send();
+                        }
+                    }
+                    catch (Throwable)
+                    {
+                        // Response sending failed
+                    }
                 }
 
                 WebSession::endSession();
+            }
+        }
+
+        private function handleWebSocketRequest(): void
+        {
+            $preRequests = $this->webConfiguration->getApplication()->getPreRequest();
+            if($preRequests !== null && count($preRequests) > 0)
+            {
+                foreach($preRequests as $preRequestModule)
+                {
+                    $preRequestModulePath = $this->buildModulePath($preRequestModule);
+                    if (file_exists($preRequestModulePath))
+                    {
+                        ExecutionHandler::executePhp($preRequestModulePath);
+                    }
+                }
+            }
+
+            $modulePath = WebSession::getModule();
+            if($modulePath === null)
+            {
+                $ws = WebSession::getWebSocket();
+                if ($ws !== null)
+                {
+                    $ws->close();
+                }
+            }
+            else
+            {
+                try
+                {
+                    ExecutionHandler::executePhp($modulePath);
+                }
+                catch (Throwable $e)
+                {
+                    Logger::getLogger()->error('WebSocket handler error', $e);
+                }
+                finally
+                {
+                    $ws = WebSession::getWebSocket();
+                    if ($ws !== null && $ws->isConnected())
+                    {
+                        $ws->close();
+                    }
+                }
+            }
+
+            $postRequests = $this->webConfiguration->getApplication()->getPostRequest();
+            if($postRequests !== null && count($postRequests) > 0)
+            {
+                foreach($postRequests as $postRequestModule)
+                {
+                    $postRequestModulePath = $this->buildModulePath($postRequestModule);
+                    if (file_exists($postRequestModulePath))
+                    {
+                        ExecutionHandler::executePhp($postRequestModulePath);
+                    }
+                }
             }
         }
 

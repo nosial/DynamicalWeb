@@ -5,14 +5,16 @@
     use DynamicalWeb\Classes\Apcu;
     use DynamicalWeb\Classes\Router;
     use DynamicalWeb\Exceptions\LocaleException;
+    use DynamicalWeb\Exceptions\WebSocketException;
     use DynamicalWeb\Objects\Locale;
     use DynamicalWeb\Objects\Request;
     use DynamicalWeb\Objects\Response;
     use DynamicalWeb\Objects\WebConfiguration\Route;
+    use DynamicalWeb\Objects\WebSocket;
+    use Exception;
     use Symfony\Component\Yaml\Exception\ParseException;
     use Symfony\Component\Yaml\Yaml;
     use Throwable;
-    use Exception;
 
     class WebSession
     {
@@ -23,6 +25,7 @@
         private static ?Route $currentRoute=null;
         private static ?Locale $locale=null;
         private static ?Throwable $exception=null;
+        private static ?WebSocket $websocket=null;
         private static array $localeFileCache = [];
         private static ?array $variables;
 
@@ -38,6 +41,19 @@
             self::$instance = $dynamicalWeb;
             self::$request = new Request($dynamicalWeb->getWebConfiguration(), $dynamicalWeb->getPackage(), $dynamicalWeb);
             self::$response = new Response();
+
+            if (getenv('WSS_ENABLED') === '1')
+            {
+                try
+                {
+                    self::$websocket = new WebSocket();
+                }
+                catch (WebSocketException $e)
+                {
+                    self::$websocket = null;
+                }
+            }
+
             $routeResult = Router::findRouteWithDetails(
                 webConfiguration: self::$instance->getWebConfiguration(),
                 request: self::$request,
@@ -68,6 +84,12 @@
          */
         public static function endSession(): void
         {
+            if (self::$websocket !== null)
+            {
+                self::$websocket->close();
+                self::$websocket = null;
+            }
+
             self::$instance = null;
             self::$request = null;
             self::$response = null;
@@ -156,6 +178,21 @@
         public static function getLocale(): ?Locale
         {
             return self::$locale;
+        }
+
+        public static function getWebSocket(): ?WebSocket
+        {
+            return self::$websocket;
+        }
+
+        public static function setWebSocket(?WebSocket $websocket): void
+        {
+            self::$websocket = $websocket;
+        }
+
+        public static function hasWebSocket(): bool
+        {
+            return self::$websocket !== null;
         }
 
         /**

@@ -13,6 +13,7 @@ This update introduces quality of life improvements
  - Added localizationId parameter to insertSection method, allowing for easier localization of sections
  - Added loadLocalization method in Functions class to allow sections to load localization sections during execution
  - Added Docker build based off the ncc image builds
+ - Added support for Websockets
 
 ### Changed
  - insertSection now accepts a path instead of a section name
@@ -20,6 +21,7 @@ This update introduces quality of life improvements
 ### Removed
 - Removed section configuration from the main configuration file, as it is no longer necessary
 - Removed dead setCompleted from Response
+- Removed dead isCompleted from Response
 
 
 ## [1.0.3] - 2026-05-25

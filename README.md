@@ -48,12 +48,19 @@ to create web applications with PHP and deploy them using ncc.
     * [Using Locales in Templates](#using-locales-in-templates)
   * [Static Resources](#static-resources)
   * [Pre and Post Request Scripts](#pre-and-post-request-scripts)
+  * [WebSocket Support](#websocket-support)
+    * [Architecture](#architecture)
+    * [WebSocket Execution Flow](#websocket-execution-flow)
+    * [Configuration](#configuration-1)
+    * [Handler Example](#handler-example)
+    * [WebSocket API](#websocket-api)
+    * [Deployment](#deployment)
   * [XSS Protection](#xss-protection)
   * [Debug Panel](#debug-panel)
   * [Built-in Pages](#built-in-pages)
   * [APCu Caching](#apcu-caching)
   * [Cookies](#cookies)
-  * [Deployment](#deployment)
+  * [Deployment](#deployment-1)
     * [Docker](#docker)
     * [Nginx Configuration](#nginx-configuration)
 * [License](#license)
@@ -437,10 +444,13 @@ A route object should have the following properties:
 
 ## DynamicalWeb Execution Flow
 
-DynamicalWeb follows a specific execution flow when handling an incoming http request, this flow can be summarized:
+DynamicalWeb follows a specific execution flow when handling an incoming request, this flow can be summarized:
 
  1. The main web entry point of the application is executed by the web server, this is usually a `index.php` file that
-    includes the code to import the web application and use DynamicalWeb to handle the incoming request, for example:
+     includes the code to import the web application and use DynamicalWeb to handle the incoming request. If the
+     `WSS_ENABLED` environment variable is set to `1` (indicating a WebSocket connection handled by the
+     [WebSocket Server](https://github.com/nosial/WebsocketServer)), DynamicalWeb detects this and follows the
+     [WebSocket execution flow](#websocket-support) instead, for example:
 
 ```php
 <?php
@@ -1151,7 +1161,10 @@ routes:
     allowed_methods: [ GET, POST ]
 ```
 
-The supported HTTP methods are: `GET`, `HEAD`, `POST`, `PUT`, `DELETE`, `CONNECT`, `OPTIONS`, `TRACE`
+The supported HTTP methods are: `GET`, `HEAD`, `POST`, `PUT`, `DELETE`, `CONNECT`, `OPTIONS`, `TRACE`, `WEBSOCKET`
+
+The `WEBSOCKET` method is a non-standard method used internally to designate routes that handle WebSocket connections.
+These routes are matched when the request originates from the WebSocket Server (see [WebSocket Support](#websocket-support)).
 
 
 ### Response Handlers
@@ -1398,6 +1411,244 @@ Here's an example of a pre-request authentication script:
     }
 ?>
 ```
+
+
+## WebSocket Support
+
+DynamicalWeb has native support for handling WebSocket connections through integration with the
+[WebsocketServer](https://github.com/nosial/WebsocketServer) — a Rust-based WebSocket-to-TCP bridge. This allows you
+to write WebSocket handlers as standard `.phtml` files using the same routing system as regular HTTP requests, with
+full access to the `WebSession`, `Request`, localization, and pre/post-request pipeline.
+
+### Architecture
+
+```
+Client (Browser) ←→ Nginx (port 8080) ←→ PHP-FPM (HTTP requests)
+                                      ←→ WebsocketServer (port 9001) ←→ PHP CLI (WebSocket connections)
+```
+
+ 1. **Nginx** listens on a single port for both HTTP and WebSocket connections. When a request includes the
+    `Upgrade: websocket` header, Nginx proxies it to the WebsocketServer instead of PHP-FPM.
+
+ 2. **WebsocketServer** (a Rust binary managed by Supervisor) accepts the WebSocket handshake, upgrades the
+    connection, and spawns a PHP CLI process for each connected client.
+
+ 3. The PHP process runs your application's entry point (`index.php`), with the `WSS_ENABLED=1` environment variable
+    set. DynamicalWeb detects this and handles the request through its WebSocket execution flow.
+
+ 4. Communication between the PHP process and the WebsocketServer happens over a local TCP bridge. The WebsocketServer
+    handles all WebSocket frame encoding/decoding — PHP reads and writes raw binary data over the TCP connection.
+
+### WebSocket Execution Flow
+
+When `WSS_ENABLED=1` is detected, `DynamicalWeb::handleRequest()` follows this flow instead of the standard HTTP flow:
+
+ 1. `WebSession` is initialized — the `Request` object is populated from `WSS_*` environment variables (path,
+    headers, cookies, client IP, query string) instead of `$_SERVER`, and the request method is set to `WEBSOCKET`
+ 2. A `WebSocket` object is created, which opens a TCP connection to the bridge and identifies itself with the
+    connection ID from the environment
+ 3. If configured, pre-request PHP scripts are executed (same as HTTP flow)
+ 4. The router matches the incoming `WSS_REQUEST_PATH` against configured routes that have
+    `allowed_methods: ['WEBSOCKET']`
+ 5. If a route matches, the configured `.phtml` handler is executed as a long-running PHP script (no output
+    buffering) — this handler manages the WebSocket connection using the `WebSocket` API
+ 6. When the handler finishes (connection closes or handler exits), post-request scripts are executed
+ 7. `WebSession::endSession()` closes the WebSocket TCP connection and clears all static state
+ 8. No HTTP response is sent — all communication happens over the WebSocket
+
+### Configuration
+
+WebSocket routes are defined in the same YAML configuration as regular routes, using `WEBSOCKET` as the allowed
+method:
+
+```yaml
+router:
+  base_path: "/"
+  routes:
+    - id: "ws_chat"
+      path: "/chat"
+      module: "websocket/chat.phtml"
+      allowed_methods: [ WEBSOCKET ]
+
+    - id: "ws_notifications"
+      path: "/notifications"
+      module: "websocket/notifications.phtml"
+      allowed_methods: [ WEBSOCKET ]
+```
+
+Routes with `allowed_methods: [ WEBSOCKET ]` will only match when the request originates from the WebSocket Server.
+The path must correspond to the URL path that the client used when establishing the WebSocket connection (e.g.,
+`new WebSocket('wss://example.com/chat')`).
+
+  > Note: The `*` wildcard does not match `WEBSOCKET` requests. You must explicitly set `allowed_methods: [ WEBSOCKET ]`
+    on WebSocket handler routes.
+
+### Handler Example
+
+A WebSocket handler is a standard `.phtml` file that uses the `WebSocket` API to communicate with the connected
+client. The handler runs as a long-lived process — it stays alive as long as the WebSocket connection is open.
+
+```php
+<?php
+    // websocket/chat.phtml
+    use DynamicalWeb\WebSession;
+
+    $ws = WebSession::getWebSocket();
+
+    // Send a welcome message
+    $ws->send(json_encode(['type' => 'connected', 'message' => 'Welcome to chat!']));
+
+    // Message loop — runs until the client disconnects
+    while ($ws->isConnected())
+    {
+        $data = $ws->read();
+
+        if ($data === null)
+        {
+            break;  // Connection closed
+        }
+
+        $message = json_decode($data, true);
+
+        if (isset($message['type']) && $message['type'] === 'ping')
+        {
+            $ws->send(json_encode(['type' => 'pong']));
+            continue;
+        }
+
+        // Broadcast or respond
+        $ws->send(json_encode([
+            'type' => 'message',
+            'content' => $message['content'] ?? '',
+            'timestamp' => time(),
+        ]));
+    }
+?>
+```
+
+Accessing the connection metadata within the handler:
+
+```php
+<?php
+    use DynamicalWeb\WebSession;
+
+    $ws = WebSession::getWebSocket();
+    $conn = $ws->getConnection();  // DynamicalWeb\WebSocket\Connection
+
+    $clientIp   = $conn->getClientIp();
+    $clientPort = $conn->getClientPort();
+    $path       = $conn->getRequestPath();
+    $headers    = $conn->getRequestHeaders();
+    $origin     = $conn->getOrigin();
+    $userAgent  = $conn->getUserAgent();
+    $protocol   = $conn->getProtocol();
+?>
+```
+
+### WebSocket API
+
+The `WebSocket` object is accessible via `WebSession::getWebSocket()` and provides the following API for
+communicating over the WebSocket connection. All data is transmitted as raw binary over the TCP bridge — the
+WebsocketServer handles encoding/decoding WebSocket frames.
+
+| Method                                            | Return Type     | Description                                                                                                  |
+|---------------------------------------------------|-----------------|--------------------------------------------------------------------------------------------------------------|
+| `getConnection()`                                 | `?Connection`   | Returns the connection metadata object populated from `WSS_*` environment variables                          |
+| `getMetadata()`                                   | `array`         | Returns the connection metadata as an associative array                                                      |
+| `send(string $data, int $chunkSize=65536)`        | `bool`          | Sends raw data to the WebSocket client. Returns `false` if the connection is closed or the payload exceeds `maxPayloadSize` |
+| `read(int $length=8192)`                          | `?string`       | Reads raw data from the WebSocket client. Returns `null` on connection close or timeout                      |
+| `readAll(int $chunkSize=65536, int $maxLength=0, float $idleTimeout=0)` | `?string` | Reads all available data until connection closes, max length reached, or idle timeout expires            |
+| `sendAndReceive(string $data, float $timeout=5.0, int $chunkSize=8192)` | `?string` | Sends data and waits for a response using kernel-level polling (`stream_select`)                         |
+| `readLine()`                                      | `?string`       | Reads a line of data (terminated by `\r\n`, `\n`, or `\r`) from the socket                                 |
+| `setTimeout(float $seconds)`                      | `void`          | Sets the read timeout on the underlying socket                                                               |
+| `setMaxPayloadSize(int $bytes)`                   | `void`          | Limits the maximum payload size for `send()` and `read()` operations                                        |
+| `isConnected()`                                   | `bool`          | Returns `true` if the connection is still alive and not timed out                                            |
+| `getSocket()`                                     | `resource\|null`| Returns the raw PHP socket resource for advanced use                                                         |
+| `getState()`                                      | `array`         | Returns diagnostic state: `connected`, `closed`, `timed_out`, `bytes_sent`, `bytes_received`                |
+| `getBytesSent()`                                  | `int`           | Returns the total number of bytes sent over this connection                                                 |
+| `getBytesReceived()`                              | `int`           | Returns the total number of bytes received over this connection                                             |
+| `close()`                                         | `void`          | Closes the connection                                                                                        |
+
+The `Connection` object provides the following accessors for the connection metadata:
+
+| Method                  | Return Type | Description                                           |
+|-------------------------|-------------|-------------------------------------------------------|
+| `getConnectionId()`     | `string`    | Unique connection ID assigned by the WebsocketServer  |
+| `getClientIp()`         | `string`    | Client IP address                                     |
+| `getClientPort()`       | `int`       | Client port                                           |
+| `getServerHost()`       | `?string`   | Server host or IP                                     |
+| `getServerPort()`       | `?int`      | Server port                                           |
+| `getRequestUri()`       | `string`    | Full request URI from the original HTTP upgrade       |
+| `getRequestPath()`      | `?string`   | Path component of the request URI                     |
+| `getRequestQuery()`     | `?string`   | Query string component of the request URI             |
+| `getRequestHeaders()`   | `array`     | All HTTP headers from the original upgrade request    |
+| `getProtocol()`         | `?string`   | `Sec-WebSocket-Protocol` header value                 |
+| `getVersion()`          | `?string`   | `Sec-WebSocket-Version` header value                  |
+| `getOrigin()`           | `?string`   | Origin header                                         |
+| `getUserAgent()`        | `?string`   | User-Agent header                                     |
+| `getHost()`             | `?string`   | Host header                                           |
+| `getXForwardedFor()`    | `?string`   | X-Forwarded-For header                                |
+| `getXRealIp()`          | `?string`   | X-Real-IP header                                      |
+| `getTcpHost()`          | `string`    | TCP bridge host (for diagnostics)                     |
+| `getTcpPort()`          | `int`       | TCP bridge port (for diagnostics)                     |
+
+### Deployment
+
+To use WebSocket support, your deployment must include the WebsocketServer binary alongside PHP-FPM and Nginx.
+The generated `Dockerfile` and `supervisord.conf` already include this setup.
+
+Key configuration files:
+
+**Nginx** (`nginx.conf`):
+```nginx
+# Map Upgrade header to connection upgrade
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+# WebSocketServer backend
+upstream websocket_backend {
+    server 127.0.0.1:9001;
+}
+
+# Intercept .php requests with WebSocket Upgrade header
+location ~ \.php$ {
+    if ($http_upgrade != '') {
+        rewrite ^ /_websocket last;
+    }
+    # ... standard PHP-FPM config ...
+}
+
+# Internal WebSocket proxy
+location = /_websocket {
+    proxy_pass http://websocket_backend;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_set_header Host $host;
+    proxy_read_timeout 86400s;
+}
+```
+
+**Supervisor** (`supervisord.conf`):
+```ini
+[program:wss]
+command=/usr/bin/wss --ws-host 127.0.0.1 --ws-port 9001 \
+    --php-executable /usr/local/bin/php \
+    --script /var/www/html/index.php
+autostart=true
+autorestart=true
+```
+
+The WebsocketServer requires the following arguments:
+- `--ws-host` / `--ws-port` — The address the WebsocketServer listens on (Nginx proxies to this)
+- `--php-executable` — Path to the PHP CLI binary
+- `--script` — Path to your application's entry point (the same `index.php` used for HTTP)
+- `--tcp-bind` / `--tcp-port` — Internal TCP bridge address (defaults to `127.0.0.1:8081`)
+
+For additional WebsocketServer options (TLS, connection limits, timeouts), refer to the
+[WebsocketServer documentation](https://github.com/nosial/WebsocketServer).
 
 
 ## XSS Protection

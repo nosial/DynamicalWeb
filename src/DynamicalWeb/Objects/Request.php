@@ -46,6 +46,12 @@
          */
         public function __construct(WebConfiguration $webConfiguration, string $package, DynamicalWeb $dynamicalWeb)
         {
+            if (getenv('WSS_ENABLED') === '1')
+            {
+                $this->initFromWebSocketEnvironment($webConfiguration, $dynamicalWeb);
+                return;
+            }
+
             // Request ID
             $this->id = uniqid();
             $this->method = RequestMethod::from($_SERVER['REQUEST_METHOD'] ?? 'GET');
@@ -117,6 +123,75 @@
             $this->pathParameters = Router::extractPathParameters($webConfiguration, $this);
 
             // Detect language from Accept-Language header
+            $this->detectedLanguage = null;
+            $this->detectedLanguage = $this->detectLanguage($dynamicalWeb->getAvailableLocaleCodes());
+        }
+
+        /**
+         * Initializes the Request object from WebSocket environment variables.
+         *
+         * @param WebConfiguration $webConfiguration The web configuration for path parameter extraction
+         * @param DynamicalWeb $dynamicalWeb The DynamicalWeb instance for language detection
+         */
+        private function initFromWebSocketEnvironment(WebConfiguration $webConfiguration, DynamicalWeb $dynamicalWeb): void
+        {
+            $this->id = uniqid();
+            $this->method = RequestMethod::WEBSOCKET;
+            $this->isSecure = getenv('WSS_SERVER_PORT') === '443';
+            $this->host = getenv('WSS_HOST') ?: 'localhost';
+            $this->httpVersion = '1.1';
+            $this->path = getenv('WSS_REQUEST_PATH') ?: '/';
+
+            $requestUri = getenv('WSS_REQUEST_URI') ?: $this->path;
+            $this->url = ($this->isSecure ? 'wss' : 'ws') . '://' . $this->host . $requestUri;
+
+            $this->queryParameters = [];
+            if (str_contains($requestUri, '?'))
+            {
+                $queryString = substr($requestUri, strpos($requestUri, '?') + 1);
+                parse_str($queryString, $this->queryParameters);
+            }
+
+            $this->bodyParameters = [];
+            $this->formParameters = [];
+            $this->files = [];
+            $this->uploadedFiles = [];
+
+            $rawHeaders = getenv('WSS_REQUEST_HEADERS');
+            $this->headers = [];
+            if ($rawHeaders !== false && $rawHeaders !== '')
+            {
+                $decoded = json_decode($rawHeaders, true);
+                if (is_array($decoded))
+                {
+                    $this->headers = $decoded;
+                }
+            }
+            $this->headersLowerMap = array_change_key_case($this->headers);
+
+            $this->cookies = [];
+            $cookieHeader = $this->getHeader('Cookie');
+            if ($cookieHeader !== null)
+            {
+                $cookiePairs = explode(';', $cookieHeader);
+                foreach ($cookiePairs as $pair)
+                {
+                    $pair = trim($pair);
+                    if (str_contains($pair, '='))
+                    {
+                        [$key, $value] = explode('=', $pair, 2);
+                        $this->cookies[trim($key)] = trim($value);
+                    }
+                }
+            }
+
+            $this->pathParameters = [];
+            $this->clientIp = getenv('WSS_CLIENT_IP') ?: null;
+            $this->rawBody = null;
+            $this->rawUserAgentString = getenv('WSS_USER_AGENT') ?: null;
+            $this->userAgent = null;
+
+            $this->pathParameters = Router::extractPathParameters($webConfiguration, $this);
             $this->detectedLanguage = null;
             $this->detectedLanguage = $this->detectLanguage($dynamicalWeb->getAvailableLocaleCodes());
         }

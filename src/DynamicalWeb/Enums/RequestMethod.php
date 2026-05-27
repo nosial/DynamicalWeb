@@ -14,6 +14,7 @@
         case CONNECT = 'CONNECT';
         case OPTIONS = 'OPTIONS';
         case TRACE = 'TRACE';
+        case WEBSOCKET = 'WEBSOCKET';
 
         /**
          * @inheritDoc

@@ -437,11 +437,4 @@
             $this->assertEquals('{"ok":true}', $response->getBody());
         }
 
-        // Completed flag
-
-        public function testDefaultCompletedIsFalse(): void
-        {
-            $response = new Response();
-            $this->assertFalse($response->isCompleted());
-        }
     }

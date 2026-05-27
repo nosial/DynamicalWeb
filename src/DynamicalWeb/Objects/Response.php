@@ -26,7 +26,6 @@
          * @var callable|null
          */
         private $streamCallback;
-        private bool $completed;
 
         /**
          * Response constructor.
@@ -44,18 +43,6 @@
             $this->responseType = ResponseType::BASIC;
             $this->filePath = null;
             $this->streamCallback = null;
-            $this->completed = false;
-        }
-
-        /**
-         * Returns whether the response has been marked as completed, indicating that no further
-         * processing (such as module execution) should occur.
-         *
-         * @return bool True if the response is completed, false otherwise.
-         */
-        public function isCompleted(): bool
-        {
-            return $this->completed;
         }
 
         /**
