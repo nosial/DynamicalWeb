@@ -161,11 +161,7 @@
                 $data = [];
                 foreach ($systemConstants as $name => $value)
                 {
-                    $data[self::escape($name)] = self::escape(
-                        is_bool($value)  ? ($value ? 'true' : 'false') :
-                        (is_null($value) ? 'null' :
-                        (is_array($value) ? json_encode($value) : (string) $value))
-                    );
+                    $data[self::escape($name)] = self::escape(self::constantValueToString($value));
                 }
                 $result .= self::buildSection('System-Defined Constants (' . count($systemConstants) . ')', self::buildParametersHtml($data));
             }
@@ -175,16 +171,51 @@
                 $data = [];
                 foreach ($userConstants as $name => $value)
                 {
-                    $data[self::escape((string) $name)] = self::escape(
-                        is_bool($value)  ? ($value ? 'true' : 'false') :
-                        (is_null($value) ? 'null' :
-                        (is_array($value) ? json_encode($value) : (string) $value))
-                    );
+                    $data[self::escape((string) $name)] = self::escape(self::constantValueToString($value));
                 }
                 $result .= self::buildSection('User-Defined Constants (' . count($userConstants) . ')', self::buildParametersHtml($data));
             }
 
             return $result;
+        }
+
+        /**
+         * Converts a constant value to its string representation, handling special float values.
+         *
+         * @param mixed $value The constant value.
+         * @return string The string representation.
+         */
+        private static function constantValueToString(mixed $value): string
+        {
+            if (is_bool($value))
+            {
+                return $value ? 'true' : 'false';
+            }
+
+            if (is_null($value))
+            {
+                return 'null';
+            }
+
+            if (is_array($value))
+            {
+                return json_encode($value);
+            }
+
+            if (is_float($value))
+            {
+                if (is_nan($value))
+                {
+                    return 'NAN';
+                }
+
+                if (is_infinite($value))
+                {
+                    return $value > 0 ? 'INF' : '-INF';
+                }
+            }
+
+            return (string) $value;
         }
 
         /**
