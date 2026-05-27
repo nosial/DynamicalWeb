@@ -448,7 +448,7 @@
          *        ResponseCode::FOUND (302).
          * @return self Returns the Response object for method chaining.
          */
-        public function setRedirect(string $url, ResponseCode $statusCode=null): self
+        public function setRedirect(string $url, ?ResponseCode $statusCode=null): self
         {
             $this->responseType = ResponseType::REDIRECT;
             
