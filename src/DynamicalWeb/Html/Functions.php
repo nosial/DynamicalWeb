@@ -143,7 +143,7 @@
         public static function insertSection(string $path, ?string $localizationId = null): void
         {
             // Resolve relative paths against the calling file's directory
-            if (strlen($path) > 0 && $path[0] !== '/' && $path[0] !== '\\')
+            if (strlen($path) > 0 && $path[0] !== '/' && $path[0] !== '\\' && !str_contains($path, '://'))
             {
                 $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
                 if (isset($trace[1]['file']))
