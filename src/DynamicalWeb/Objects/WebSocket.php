@@ -214,6 +214,7 @@
 
             if ($available === 0)
             {
+                $this->applySocketTimeout();
                 return null;
             }
 
@@ -224,7 +225,9 @@
                 if (feof($this->socket))
                 {
                     $this->connected = false;
+                    return null;
                 }
+                $this->applySocketTimeout();
                 return null;
             }
 
@@ -284,6 +287,7 @@
 
                 if ($available === 0)
                 {
+                    $this->applySocketTimeout();
                     if ($idleTimeout > 0)
                     {
                         $idleTimer += 0.05;
@@ -299,7 +303,9 @@
                     if (feof($this->socket))
                     {
                         $this->connected = false;
+                        break;
                     }
+                    $this->applySocketTimeout();
                     break;
                 }
 
@@ -391,7 +397,9 @@
                         if (feof($this->socket))
                         {
                             $this->connected = false;
+                            break;
                         }
+                        $this->applySocketTimeout();
                         break;
                     }
                     $result .= $data;
@@ -407,9 +415,13 @@
                         $remaining = $timeout;
                     }
                 }
-                elseif (!$noTimeout)
+                else
                 {
-                    $remaining -= $seconds + ($microseconds / 1000000);
+                    $this->applySocketTimeout();
+                    if (!$noTimeout)
+                    {
+                        $remaining -= $seconds + ($microseconds / 1000000);
+                    }
                 }
             }
 
@@ -462,7 +474,18 @@
                 return false;
             }
 
-            if (!empty($metadata['timed_out']) || feof($this->socket))
+            if (!empty($metadata['timed_out']))
+            {
+                $this->applySocketTimeout();
+                $metadata = @stream_get_meta_data($this->socket);
+                if (!empty($metadata['timed_out']))
+                {
+                    $this->connected = false;
+                    return false;
+                }
+            }
+
+            if (feof($this->socket))
             {
                 $this->connected = false;
                 return false;
