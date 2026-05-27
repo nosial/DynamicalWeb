@@ -201,6 +201,22 @@
                 $length = $this->maxPayloadSize;
             }
 
+            $read = [$this->socket];
+            $write = null;
+            $except = null;
+            $available = @stream_select($read, $write, $except, $this->readTimeoutSec, $this->readTimeoutUsec);
+
+            if ($available === false)
+            {
+                $this->connected = false;
+                return null;
+            }
+
+            if ($available === 0)
+            {
+                return null;
+            }
+
             $data = @fread($this->socket, $length);
 
             if ($data === false || $data === '')
@@ -255,25 +271,36 @@
                 $remaining = $maxLength > 0 ? $maxLength - $totalRead : $chunkSize;
                 $readSize = $remaining < $chunkSize ? $remaining : $chunkSize;
 
-                $data = @fread($this->socket, $readSize);
+                $read = [$this->socket];
+                $write = null;
+                $except = null;
+                $available = @stream_select($read, $write, $except, 0, 50000);
 
-                if ($data === false)
+                if ($available === false)
                 {
                     $this->connected = false;
                     break;
                 }
 
-                if ($data === '')
+                if ($available === 0)
+                {
+                    if ($idleTimeout > 0)
+                    {
+                        $idleTimer += 0.05;
+                    }
+                    usleep(50000);
+                    continue;
+                }
+
+                $data = @fread($this->socket, $readSize);
+
+                if ($data === false || $data === '')
                 {
                     if (feof($this->socket))
                     {
                         $this->connected = false;
-                        break;
                     }
-
-                    $idleTimer += 0.05;
-                    usleep(50000);
-                    continue;
+                    break;
                 }
 
                 $result .= $data;
@@ -435,7 +462,7 @@
                 return false;
             }
 
-            if (feof($this->socket))
+            if (!empty($metadata['timed_out']) || feof($this->socket))
             {
                 $this->connected = false;
                 return false;
