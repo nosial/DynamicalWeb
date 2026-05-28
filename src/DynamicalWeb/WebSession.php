@@ -3,6 +3,7 @@
     namespace DynamicalWeb;
 
     use DynamicalWeb\Classes\Apcu;
+    use DynamicalWeb\Classes\Logger;
     use DynamicalWeb\Classes\Router;
     use DynamicalWeb\Exceptions\LocaleException;
     use DynamicalWeb\Exceptions\WebSocketException;
@@ -47,9 +48,11 @@
                 try
                 {
                     self::$websocket = new WebSocket();
+                    Logger::getLogger()->debug('WebSocket connection established via TCP bridge');
                 }
                 catch (WebSocketException $e)
                 {
+                    Logger::getLogger()->warning('Failed to initialize WebSocket connection: ' . $e->getMessage());
                     self::$websocket = null;
                 }
             }
@@ -86,6 +89,10 @@
         {
             if (self::$websocket !== null)
             {
+                if (self::$websocket->isConnected())
+                {
+                    Logger::getLogger()->debug('WebSession: closing WebSocket connection on session end');
+                }
                 self::$websocket->close();
                 self::$websocket = null;
             }

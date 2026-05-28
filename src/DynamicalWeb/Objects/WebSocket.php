@@ -9,9 +9,6 @@
     class WebSocket
     {
         private ?ConnectionDetails $connection;
-        /**
-         * @var resource|null
-         */
         private $socket = null;
         private bool $connected = false;
         private bool $closed = false;
@@ -20,13 +17,8 @@
         private int $readTimeoutSec = 0;
         private int $readTimeoutUsec = 50000;
         private int $maxPayloadSize = 0;
+        private int $connectTimeout = 30;
 
-        /**
-         * WebSocket constructor.
-         *
-         * Initializes the WebSocket connection using environment variables. If the required environment variables are not set, an exception is thrown.
-         * @throws WebSocketException if the connection details cannot be obtained from the environment or if the connection fails.
-         */
         public function __construct()
         {
             $this->connection = ConnectionDetails::fromEnvironment();
@@ -34,19 +26,18 @@
             if ($this->connection === null)
             {
                 throw new WebSocketException(
-                    'WebsocketLib: WSS_ENABLED environment variable is not set to "1". This library must be executed within a WebSocket Server PHP process.'
+                    'WSS_ENABLED environment variable is not set to "1". This library must be executed within a WebSocket Server PHP process.'
                 );
             }
 
             $this->connect();
         }
 
-        /**
-         * Establishes a TCP connection to the WebSocket server using the connection details obtained from the
-         * environment. If the connection fails, an exception is thrown.
-         *
-         * @throws WebSocketException if the TCP host or port is invalid or if the connection fails.
-         */
+        public function setConnectTimeout(int $seconds): void
+        {
+            $this->connectTimeout = $seconds;
+        }
+
         private function connect(): void
         {
             $host = $this->connection->getTcpHost();
@@ -54,17 +45,21 @@
 
             if ($host === '' || $port <= 0)
             {
-                throw new WebSocketException('Invalid TCP host or port from environment');
+                throw new WebSocketException(
+                    'Invalid TCP host or port from environment: host="' . $host . '", port=' . $port
+                );
             }
 
             $errno = 0;
             $errstr = '';
-            $this->socket = @fsockopen($host, $port, $errno, $errstr, 30);
+            $this->socket = @fsockopen($host, $port, $errno, $errstr, $this->connectTimeout);
 
             if ($this->socket === false)
             {
                 $this->socket = null;
-                throw new WebSocketException("Failed to connect to {$host}:{$port} - {$errstr} ({$errno})");
+                throw new WebSocketException(
+                    "Failed to connect to TCP bridge {$host}:{$port} — {$errstr} ({$errno})"
+                );
             }
 
             $this->applySocketTimeout();
@@ -74,16 +69,18 @@
             $connId = $this->connection->getConnectionId();
             if ($connId !== '')
             {
-                @fwrite($this->socket, $connId . "\n");
+                $written = @fwrite($this->socket, $connId . "\n");
+                if ($written === false || $written === 0)
+                {
+                    $this->close();
+                    throw new WebSocketException(
+                        "Failed to send connection ID to TCP bridge {$host}:{$port}"
+                    );
+                }
                 @fflush($this->socket);
             }
         }
 
-        /**
-         * Sets the read timeout for the WebSocket connection.
-         *
-         * @param float $seconds The read timeout in seconds (can be a fractional value).
-         */
         public function setTimeout(float $seconds): void
         {
             $this->readTimeoutSec = (int)$seconds;
@@ -91,11 +88,6 @@
             $this->applySocketTimeout();
         }
 
-        /**
-         * Applies the current read timeout settings to the socket connection.
-         *
-         * This method is called internally whenever the read timeout is updated to ensure that the new timeout values are applied to the socket.
-         */
         private function applySocketTimeout(): void
         {
             if ($this->socket !== null)
@@ -104,31 +96,16 @@
             }
         }
 
-        /**
-         * Sets the maximum payload size for sending and receiving data over the WebSocket connection.
-         *
-         * @param int $bytes The maximum payload size in bytes. A value of 0 means no limit.
-         */
         public function setMaxPayloadSize(int $bytes): void
         {
             $this->maxPayloadSize = $bytes;
         }
 
-        /**
-         * Gets the current connection details for this WebSocket connection.
-         *
-         * @return ConnectionDetails|null The connection details, or null if the connection details could not be obtained from the environment.
-         */
         public function getConnection(): ?ConnectionDetails
         {
             return $this->connection;
         }
 
-        /**
-         * Gets the metadata associated with the WebSocket connection.
-         *
-         * @return array An associative array containing the connection metadata, or an empty array if the connection details are not available.
-         */
         public function getMetadata(): array
         {
             if ($this->connection === null)
@@ -139,13 +116,6 @@
             return $this->connection->toArray();
         }
 
-        /**
-         * Sends data over the WebSocket connection.
-         *
-         * @param string $data The data to send.
-         * @param int $chunkSize The size of each chunk to send (default is 65536 bytes).
-         * @return bool True if the data was sent successfully, false otherwise.
-         */
         public function send(string $data, int $chunkSize = 65536): bool
         {
             if (!$this->isConnected())
@@ -183,12 +153,6 @@
             return true;
         }
 
-        /**
-         * Reads data from the WebSocket connection.
-         *
-         * @param int $length The maximum number of bytes to read (default is 8192 bytes).
-         * @return string|null The data read from the connection, or null if the connection is closed or an error occurs.
-         */
         public function read(int $length = 8192): ?string
         {
             if (!$this->isConnected())
@@ -235,14 +199,6 @@
             return $data;
         }
 
-        /**
-         * Reads data from the WebSocket connection in chunks until the specified conditions are met.
-         *
-         * @param int $chunkSize The size of each chunk to read (default is 65536 bytes).
-         * @param int $maxLength The maximum total length of data to read (default is 0, which means no limit).
-         * @param float $idleTimeout The maximum idle time in seconds before stopping the read operation (default is 0, which means no timeout).
-         * @return string|null The data read from the connection, or null if the connection is closed or an error occurs.
-         */
         public function readAll(int $chunkSize = 65536, int $maxLength = 0, float $idleTimeout = 0): ?string
         {
             if (!$this->isConnected())
@@ -323,14 +279,6 @@
             return $result === '' ? null : $result;
         }
 
-        /**
-         * Sends data over the WebSocket connection and waits for a response.
-         *
-         * @param string $data The data to send.
-         * @param float $timeout The maximum time in seconds to wait for a response (default is 5.0 seconds).
-         * @param int $chunkSize The size of each chunk to read when waiting for a response (default is 8192 bytes).
-         * @return string|null The response received from the connection, or null if the connection is closed, an error occurs, or the timeout is reached.
-         */
         public function sendAndReceive(string $data, float $timeout = 5.0, int $chunkSize = 8192): ?string
         {
             if (!$this->send($data))
@@ -342,13 +290,88 @@
             return $this->readWithSelect($timeout, $chunkSize);
         }
 
-        /**
-         * Reads data from the WebSocket connection using stream_select to wait for data to become available.
-         *
-         * @param float $timeout The maximum time in seconds to wait for data (default is 5.0 seconds).
-         * @param int $chunkSize The size of each chunk to read when data becomes available (default is 8192 bytes).
-         * @return string|null The data read from the connection, or null if the connection is closed, an error occurs, or the timeout is reached.
-         */
+        public function sendAndReceiveAll(
+            string $data,
+            float $timeout = 5.0,
+            int $chunkSize = 65536,
+            int $maxLength = 0,
+            float $idleTimeout = 0.5
+        ): ?string
+        {
+            if (!$this->send($data))
+            {
+                return null;
+            }
+
+            @fflush($this->socket);
+
+            $result = '';
+            $totalRead = 0;
+            $deadline = microtime(true) + $timeout;
+
+            while (true)
+            {
+                $remaining = microtime(true);
+                if ($remaining >= $deadline)
+                {
+                    break;
+                }
+
+                if ($maxLength > 0 && $totalRead >= $maxLength)
+                {
+                    break;
+                }
+
+                $remainingLen = $maxLength > 0 ? $maxLength - $totalRead : $chunkSize;
+                $readSize = $remainingLen < $chunkSize ? $remainingLen : $chunkSize;
+
+                $read = [$this->socket];
+                $write = null;
+                $except = null;
+                $timeLeft = max(0, $deadline - microtime(true));
+                $sec = (int)$timeLeft;
+                $usec = (int)(($timeLeft - $sec) * 1000000);
+
+                $available = @stream_select($read, $write, $except, $sec, $usec);
+
+                if ($available === false)
+                {
+                    $this->connected = false;
+                    break;
+                }
+
+                if ($available === 0)
+                {
+                    $this->applySocketTimeout();
+                    break;
+                }
+
+                $data = @fread($this->socket, $readSize);
+
+                if ($data === false || $data === '')
+                {
+                    if (feof($this->socket))
+                    {
+                        $this->connected = false;
+                        break;
+                    }
+                    $this->applySocketTimeout();
+                    break;
+                }
+
+                $result .= $data;
+                $totalRead += strlen($data);
+
+                if ($this->maxPayloadSize > 0 && $totalRead > $this->maxPayloadSize)
+                {
+                    break;
+                }
+            }
+
+            $this->bytesReceived += strlen($result);
+            return $result === '' ? null : $result;
+        }
+
         private function readWithSelect(float $timeout, int $chunkSize): ?string
         {
             $result = '';
@@ -428,11 +451,6 @@
             return $result === '' ? null : $result;
         }
 
-        /**
-         * Reads a single line of data from the WebSocket connection.
-         *
-         * @return string|null The line read from the connection, or null if the connection is closed or an error occurs.
-         */
         public function readLine(): ?string
         {
             if (!$this->isConnected())
@@ -455,11 +473,6 @@
             return rtrim($data, "\r\n");
         }
 
-        /**
-         * Checks if the WebSocket connection is currently active and valid.
-         *
-         * @return bool True if the connection is active and valid, false otherwise.
-         */
         public function isConnected(): bool
         {
             if ($this->closed || $this->socket === null)
@@ -494,21 +507,36 @@
             return $this->connected;
         }
 
-        /**
-         * Returns the underlying socket resource for this WebSocket connection.
-         *
-         * @return resource|null The socket resource, or null if the connection is closed.
-         */
+        public function waitForData(float $timeout = 0): bool
+        {
+            if (!$this->isConnected())
+            {
+                return false;
+            }
+
+            $read = [$this->socket];
+            $write = null;
+            $except = null;
+
+            $sec = $timeout > 0 ? (int)$timeout : 0;
+            $usec = $timeout > 0 ? (int)(($timeout - $sec) * 1000000) : 100000;
+
+            $available = @stream_select($read, $write, $except, $sec, $usec);
+
+            if ($available === false)
+            {
+                $this->connected = false;
+                return false;
+            }
+
+            return $available > 0;
+        }
+
         public function getSocket()
         {
             return $this->socket;
         }
 
-        /**
-         * Gets the current state of the WebSocket connection, including connection status, timeout status, and byte counts.
-         *
-         * @return ConnectionState An object representing the current state of the WebSocket connection state
-         */
         public function getState(): ConnectionState
         {
             $timedOut = false;
@@ -530,33 +558,28 @@
             ]);
         }
 
-        /**
-         * Gets the total number of bytes sent over this WebSocket connection.
-         *
-         * @return int The total number of bytes sent.
-         */
         public function getBytesSent(): int
         {
             return $this->bytesSent;
         }
 
-        /**
-         * Gets the total number of bytes received over this WebSocket connection.
-         *
-         * @return int The total number of bytes received.
-         */
         public function getBytesReceived(): int
         {
             return $this->bytesReceived;
         }
 
-        /**
-         * Closes the WebSocket connection and releases any associated resources.
-         *
-         * After calling this method, the connection will be marked as closed and any attempts to read from or write to the connection will fail.
-         */
+        public function disconnect(): void
+        {
+            $this->close();
+        }
+
         public function close(): void
         {
+            if ($this->closed)
+            {
+                return;
+            }
+
             $this->closed = true;
             $this->connected = false;
 
@@ -567,14 +590,12 @@
             }
         }
 
-
-        /**
-         * WebSocket destructor.
-         *
-         * Ensures that the WebSocket connection is properly closed when the object is destroyed.
-         */
         public function __destruct()
         {
-            $this->close();
+            if ($this->socket !== null)
+            {
+                @fclose($this->socket);
+                $this->socket = null;
+            }
         }
     }

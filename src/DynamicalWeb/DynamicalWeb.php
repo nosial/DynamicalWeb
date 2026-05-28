@@ -358,6 +358,8 @@
 
         private function handleWebSocketRequest(): void
         {
+            Logger::getLogger()->info('WebSocket request detected, executing WebSocket handler');
+
             $preRequests = $this->webConfiguration->getApplication()->getPreRequest();
             if($preRequests !== null && count($preRequests) > 0)
             {
@@ -374,6 +376,7 @@
             $modulePath = WebSession::getModule();
             if($modulePath === null)
             {
+                Logger::getLogger()->warning('WebSocket request: no matching route found, closing connection');
                 $ws = WebSession::getWebSocket();
                 if ($ws !== null)
                 {
@@ -382,19 +385,23 @@
             }
             else
             {
+                Logger::getLogger()->debug('WebSocket request: executing module: ' . $modulePath);
+
                 try
                 {
                     ExecutionHandler::executePhp($modulePath);
+                    Logger::getLogger()->debug('WebSocket request: module execution completed');
                 }
                 catch (Throwable $e)
                 {
-                    Logger::getLogger()->error('WebSocket handler error', $e);
+                    Logger::getLogger()->error('WebSocket handler error: ' . $e->getMessage(), $e);
                 }
                 finally
                 {
                     $ws = WebSession::getWebSocket();
                     if ($ws !== null && $ws->isConnected())
                     {
+                        Logger::getLogger()->debug('WebSocket request: closing connection after module execution');
                         $ws->close();
                     }
                 }
