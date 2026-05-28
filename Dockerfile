@@ -18,19 +18,10 @@
 #   COPY index.php /var/www/html/index.php
 #
 
-ARG PHP_VERSION=8.5
-
-# Build DynamicalWeb NCC Package
-FROM ghcr.io/nosial/ncc:latest AS dw-builder
-
-WORKDIR /tmp/dw
-COPY . .
-RUN ncc build --configuration release
-
 # Production Image
 FROM ghcr.io/nosial/ncc:fpm
 
-ARG PHP_VERSION
+ARG PHP_VERSION=8.5
 LABEL maintainer="Netkas <netkas@nosial.net>"
 LABEL org.opencontainers.image.title="DynamicalWeb"
 LABEL org.opencontainers.image.version="1.0.0"
@@ -46,11 +37,7 @@ RUN install-php-extensions apcu sockets \
 
 # download pre-built WebsocketServer binary
 RUN curl -sL "https://github.com/nosial/WebsocketServer/releases/latest/download/websocket-server" -o /usr/bin/wss && \
-    chmod +x /usr/bin/wss && apt purge -y --auto-remove curl 
-
-# Install DynamicalWeb ncc package
-COPY --from=dw-builder /tmp/dw/target/release/net.nosial.dynamicalweb.ncc /tmp/dw.ncc
-RUN ncc install --package="/tmp/dw.ncc" -y && rm /tmp/dw.ncc
+    chmod +x /usr/bin/wss && apt purge -y --auto-remove curl
 
 # Create required directories
 RUN mkdir -p /var/www/html /var/log/nginx /var/log/supervisor
