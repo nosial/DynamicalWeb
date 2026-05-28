@@ -14,8 +14,8 @@
         private bool $closed = false;
         private int $bytesSent = 0;
         private int $bytesReceived = 0;
-        private int $readTimeoutSec = 0;
-        private int $readTimeoutUsec = 50000;
+        private ?int $readTimeoutSec = null;
+        private ?int $readTimeoutUsec = null;
         private int $maxPayloadSize = 0;
         private int $connectTimeout = 30;
 
@@ -81,16 +81,25 @@
             }
         }
 
-        public function setTimeout(float $seconds): void
+        public function setTimeout(?float $seconds): void
         {
-            $this->readTimeoutSec = (int)$seconds;
-            $this->readTimeoutUsec = (int)(($seconds - $this->readTimeoutSec) * 1000000);
+            if ($seconds === null || $seconds <= 0)
+            {
+                $this->readTimeoutSec = null;
+                $this->readTimeoutUsec = null;
+            }
+            else
+            {
+                $this->readTimeoutSec = (int)$seconds;
+                $this->readTimeoutUsec = (int)(($seconds - $this->readTimeoutSec) * 1000000);
+            }
+
             $this->applySocketTimeout();
         }
 
         private function applySocketTimeout(): void
         {
-            if ($this->socket !== null)
+            if ($this->socket !== null && $this->readTimeoutSec !== null)
             {
                 stream_set_timeout($this->socket, $this->readTimeoutSec, $this->readTimeoutUsec);
             }
