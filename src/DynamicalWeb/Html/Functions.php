@@ -145,10 +145,18 @@
             // Resolve relative paths against the calling file's directory
             if (strlen($path) > 0 && $path[0] !== '/' && $path[0] !== '\\' && !str_contains($path, '://'))
             {
-                $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-                if (isset($trace[1]['file']))
+                $baseDir = ExecutionHandler::getCurrentExecutingDirectory();
+                if ($baseDir !== null)
                 {
-                    $path = dirname($trace[1]['file']) . DIRECTORY_SEPARATOR . $path;
+                    $path = $baseDir . DIRECTORY_SEPARATOR . $path;
+                }
+                else
+                {
+                    $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+                    if (isset($trace[1]['file']))
+                    {
+                        $path = dirname($trace[1]['file']) . DIRECTORY_SEPARATOR . $path;
+                    }
                 }
             }
 
