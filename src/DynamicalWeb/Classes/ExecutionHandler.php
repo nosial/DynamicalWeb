@@ -7,6 +7,21 @@
 
     class ExecutionHandler
     {
+        /** @var string[] Stack of file paths currently being executed */
+        private static array $executingFiles = [];
+
+        /**
+         * Returns the directory of the file currently being executed,
+         * or null if no file is being executed through this handler.
+         *
+         * @return string|null
+         */
+        public static function getCurrentExecutingDirectory(): ?string
+        {
+            $count = count(self::$executingFiles);
+            return $count > 0 ? dirname(self::$executingFiles[$count - 1]) : null;
+        }
+
         /**
          * Executes a PHTML file with output buffering
          *
@@ -25,6 +40,8 @@
             $previousHandler = set_exception_handler(null);
             $startTime       = microtime(true);
             ob_start();
+
+            self::$executingFiles[] = $filePath;
 
             try
             {
@@ -47,6 +64,7 @@
             }
             finally
             {
+                array_pop(self::$executingFiles);
                 DebugPanel::trackFileExecution($filePath, 'phtml', microtime(true) - $startTime);
 
                 if ($previousHandler !== null)
@@ -74,6 +92,8 @@
             $previousHandler = set_exception_handler(null);
             $startTime       = microtime(true);
 
+            self::$executingFiles[] = $filePath;
+
             try
             {
                 include $filePath;
@@ -84,6 +104,7 @@
             }
             finally
             {
+                array_pop(self::$executingFiles);
                 DebugPanel::trackFileExecution($filePath, 'php', microtime(true) - $startTime);
 
                 if ($previousHandler !== null)

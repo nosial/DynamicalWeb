@@ -5,7 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.8] - Ongoing
+## [1.0.8] - 2026-05-28
+
+This update introduces a bug fix
+
+### Added
+ - ExecutionHandler now keeps track of executed files
+
+### Fixed
+ - Functions::insertSection can now resolve relative paths correctly
 
 
 
@@ -14,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Fixed websocket timing issues
 
 
-## [1.0.6] - 2026-05-27
+### [1.0.6] - 2026-05-27
 
 This update introduces a critical bug fix
 
