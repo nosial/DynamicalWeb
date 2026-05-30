@@ -6,8 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [1.0.10] - Ongoing
+## [1.0.10] - 2026-05-30
 
+This update introduces some minor improvements and changes to the project
+
+### Changed
+ - Added LogLib environment configuration to the Dockerfile
+
+### Removed
+ - Removed php-fpm's logging configuration from supervisord.conf
 
 
 
