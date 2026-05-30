@@ -29,6 +29,11 @@ LABEL org.opencontainers.image.description="Base image for PHP web applications 
 LABEL org.opencontainers.image.url="https://github.com/nosial/DynamicalWeb"
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL ncc.package="net.nosial.dynamicalweb"
+ENV LOGLIB_CONSOLE_ENABLED=false
+ENV LOGLIB_UDP_ENABLED=true
+ENV LOGLIB_UDP_HOST=127.0.0.1
+ENV LOGLIB_UDP_PORT=9003
+ENV LOGLIB_UDP_TRACE_FORMAT=full
 
 # Install runtime dependencies and extensions
 RUN apt update && apt install -y --no-install-recommends nginx supervisor ca-certificates curl && rm -rf /var/lib/apt/lists/*
