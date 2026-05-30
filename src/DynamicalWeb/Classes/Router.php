@@ -450,6 +450,13 @@
             // Check for wildcard
             if (in_array('*', $allowedMethods))
             {
+                // Wildcard allows all standard HTTP methods,
+                // but WEBSOCKET must be explicitly listed
+                if ($method === RequestMethod::WEBSOCKET)
+                {
+                    return in_array(RequestMethod::WEBSOCKET->value, $allowedMethods);
+                }
+
                 return true;
             }
 
