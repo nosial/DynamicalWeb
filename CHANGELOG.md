@@ -11,6 +11,7 @@ This update introduces some changes
 
 ### Changed
  - Updated supervisord and Dockerfile to include LogLib2Server
+ - Refactored proper Enum usage in codebase for better performance and maintainability
 
 
 
