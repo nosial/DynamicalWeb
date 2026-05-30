@@ -35,9 +35,11 @@ RUN apt update && apt install -y --no-install-recommends nginx supervisor ca-cer
 RUN install-php-extensions apcu sockets \
     && echo "apc.enable_cli=1" >> /usr/local/etc/php/conf.d/docker-php-ext-apcu.ini
 
-# download pre-built WebsocketServer binary
-RUN curl -sL "https://github.com/nosial/WebsocketServer/releases/latest/download/websocket-server" -o /usr/bin/wss && \
-    chmod +x /usr/bin/wss && apt purge -y --auto-remove curl
+# download pre-built WebsocketServer binary & logger
+RUN curl -sL "https://github.com/nosial/WebsocketServer/releases/latest/download/websocket-server-linux-x86_64" -o /usr/bin/wss && \
+    curl -sL "https://github.com/nosial/LogLib2Server/releases/latest/download/LogLib2Server-linux-x86_64" -o /usr/bin/ll2s && \
+    chmod +x /usr/bin/wss && chmod +x /usr/bin/ll2s  && apt purge -y --auto-remove curl
+
 
 # Create required directories
 RUN mkdir -p /var/www/html /var/log/nginx /var/log/supervisor
