@@ -3,6 +3,7 @@
     namespace DynamicalWeb\Classes;
 
     use DynamicalWeb\Enums\PathConstants;
+    use DynamicalWeb\Enums\RequestMethod;
     use DynamicalWeb\Objects\Request;
     use DynamicalWeb\Objects\RouteResult;
     use DynamicalWeb\Objects\WebConfiguration;
@@ -29,7 +30,7 @@
         {
             $routerConfiguration = $webConfiguration->getRouter();
             $requestPath   = self::normalizePath($request->getPath(), $routerConfiguration->getBasePath());
-            $requestMethod = $request->getMethod()->value;
+            $requestMethod = $request->getMethod();
 
             // Built-in /dynaweb/* paths are never APCu-cached (dynamic/debug endpoints)
             if (str_starts_with($requestPath, self::BUILTIN_RESOURCE_PREFIX))
@@ -48,7 +49,7 @@
 
             // APCu route resolution cache — keyed by app root + method + path
             $appKey    = md5($webRootPath);
-            $cacheKey  = 'dw_rtres_' . $appKey . '_' . $requestMethod . '_' . md5($requestPath);
+            $cacheKey  = 'dw_rtres_' . $appKey . '_' . $requestMethod->value . '_' . md5($requestPath);
             $cached    = Apcu::fetch($cacheKey, $hit);
             if ($hit && is_array($cached))
             {
@@ -120,7 +121,7 @@
          *
          * @param RouterConfiguration $routerConfiguration The router configuration containing defined routes and response handlers
          * @param string $requestPath The normalized request path to resolve
-         * @param string $requestMethod The HTTP method of the request (e.g. GET, POST, etc.)
+         * @param RequestMethod $requestMethod The HTTP method of the request (e.g. GET, POST, etc.)
          * @param string $webRootPath The web root path for resolving module paths
          * @param string $webResourcesPath The path to static web resources for resolving static file requests
          * @return RouteResult Result containing the resolved module path (if any) and the associated Route object (if any)
@@ -128,7 +129,7 @@
         private static function resolveRoute(
             RouterConfiguration $routerConfiguration,
             string              $requestPath,
-            string              $requestMethod,
+            RequestMethod       $requestMethod,
             string              $webRootPath,
             string              $webResourcesPath
         ): RouteResult
@@ -327,7 +328,7 @@
         {
             $routerConfiguration = $webConfiguration->getRouter();
             $requestPath = self::normalizePath($request->getPath(), $routerConfiguration->getBasePath());
-            $requestMethod = $request->getMethod()->value;
+            $requestMethod = $request->getMethod();
 
             // First try exact match - no parameters
             $route = $routerConfiguration->getRoute($requestPath);
@@ -440,10 +441,10 @@
          * Checks if the HTTP method of the request is allowed for the given route based on its allowed methods configuration.
          *
          * @param Route $route The route object containing the allowed methods configuration
-         * @param string $method The HTTP method of the incoming request (e.g. GET, POST, etc.)
+         * @param RequestMethod $method The HTTP method of the incoming request (e.g. GET, POST, etc.)
          * @return bool True if the method is allowed for the route, false otherwise
          */
-        private static function isMethodAllowed(Route $route, string $method): bool
+        private static function isMethodAllowed(Route $route, RequestMethod $method): bool
         {
             $allowedMethods = $route->getAllowedMethods();
             
@@ -461,7 +462,7 @@
             }
 
             // Check if method is in allowed list
-            return in_array($method, $allowedMethods);
+            return in_array($method->value, $allowedMethods, true);
         }
 
         /**

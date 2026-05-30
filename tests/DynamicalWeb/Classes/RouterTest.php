@@ -2,6 +2,7 @@
 
     namespace DynamicalWeb\Classes;
 
+    use DynamicalWeb\Enums\RequestMethod;
     use DynamicalWeb\Objects\WebConfiguration\Route;
     use PHPUnit\Framework\TestCase;
     use ReflectionClass;
@@ -210,9 +211,9 @@
         public function testWildcardAllowsAll(): void
         {
             $route = new Route(['path' => '/', 'module' => 'index.phtml']);
-            $this->assertTrue($this->isMethodAllowed->invoke(null, $route, 'GET'));
-            $this->assertTrue($this->isMethodAllowed->invoke(null, $route, 'POST'));
-            $this->assertTrue($this->isMethodAllowed->invoke(null, $route, 'DELETE'));
+            $this->assertTrue($this->isMethodAllowed->invoke(null, $route, RequestMethod::GET));
+            $this->assertTrue($this->isMethodAllowed->invoke(null, $route, RequestMethod::POST));
+            $this->assertTrue($this->isMethodAllowed->invoke(null, $route, RequestMethod::DELETE));
         }
 
         public function testSpecificMethodsAllowed(): void
@@ -222,10 +223,10 @@
                 'module' => 'index.phtml',
                 'allowed_methods' => ['GET', 'POST'],
             ]);
-            $this->assertTrue($this->isMethodAllowed->invoke(null, $route, 'GET'));
-            $this->assertTrue($this->isMethodAllowed->invoke(null, $route, 'POST'));
-            $this->assertFalse($this->isMethodAllowed->invoke(null, $route, 'DELETE'));
-            $this->assertFalse($this->isMethodAllowed->invoke(null, $route, 'PUT'));
+            $this->assertTrue($this->isMethodAllowed->invoke(null, $route, RequestMethod::GET));
+            $this->assertTrue($this->isMethodAllowed->invoke(null, $route, RequestMethod::POST));
+            $this->assertFalse($this->isMethodAllowed->invoke(null, $route, RequestMethod::DELETE));
+            $this->assertFalse($this->isMethodAllowed->invoke(null, $route, RequestMethod::PUT));
         }
 
         public function testSingleMethodAllowed(): void
@@ -235,8 +236,8 @@
                 'module' => 'index.phtml',
                 'allowed_methods' => ['GET'],
             ]);
-            $this->assertTrue($this->isMethodAllowed->invoke(null, $route, 'GET'));
-            $this->assertFalse($this->isMethodAllowed->invoke(null, $route, 'POST'));
+            $this->assertTrue($this->isMethodAllowed->invoke(null, $route, RequestMethod::GET));
+            $this->assertFalse($this->isMethodAllowed->invoke(null, $route, RequestMethod::POST));
         }
 
         // matchRouteAndExtractParameters tests
