@@ -65,3 +65,6 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 WORKDIR /var/www/html
 EXPOSE 8080
 ENTRYPOINT ["docker-entrypoint.sh"]
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8080/dynaweb/health || exit 1
