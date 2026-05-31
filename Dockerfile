@@ -22,45 +22,46 @@
 FROM ghcr.io/nosial/ncc:fpm
 
 ARG PHP_VERSION=8.5
-LABEL maintainer="Netkas <netkas@nosial.net>"
-LABEL org.opencontainers.image.title="DynamicalWeb"
-LABEL org.opencontainers.image.version="1.0.0"
-LABEL org.opencontainers.image.description="Base image for PHP web applications with ncc, nginx, and WebsocketServer"
-LABEL org.opencontainers.image.url="https://github.com/nosial/DynamicalWeb"
-LABEL org.opencontainers.image.licenses="MIT"
-LABEL ncc.package="net.nosial.dynamicalweb"
-ENV LOGLIB_CONSOLE_ENABLED=false
-ENV LOGLIB_UDP_ENABLED=true
-ENV LOGLIB_UDP_HOST=127.0.0.1
-ENV LOGLIB_UDP_PORT=9003
-ENV LOGLIB_UDP_TRACE_FORMAT=full
 
-# Install runtime dependencies and extensions
-RUN apt update && apt install -y --no-install-recommends nginx supervisor ca-certificates curl && rm -rf /var/lib/apt/lists/*
-RUN install-php-extensions apcu sockets \
+LABEL maintainer="Netkas <netkas@nosial.net>" \
+      org.opencontainers.image.title="DynamicalWeb" \
+      org.opencontainers.image.version="1.0.0" \
+      org.opencontainers.image.description="Base image for PHP web applications with ncc, nginx, memcached, and WebsocketServer" \
+      org.opencontainers.image.url="https://github.com/nosial/DynamicalWeb" \
+      org.opencontainers.image.licenses="MIT" \
+      ncc.package="net.nosial.dynamicalweb"
+
+ENV LOGLIB_CONSOLE_ENABLED=false \
+    LOGLIB_UDP_ENABLED=true \
+    LOGLIB_UDP_HOST=127.0.0.1 \
+    LOGLIB_UDP_PORT=9003 \
+    LOGLIB_UDP_TRACE_FORMAT=full \
+    MEMCACHED_ENABLED=0 \
+    MEMCACHED_HOST=127.0.0.1 \
+    MEMCACHED_PORT=11211 \
+    MEMCACHED_SESSION_TTL=3600 \
+    MEMCACHED_SESSION_PREFIX=dw_sess_ \
+    MEMCACHED_SESSION_COOKIE=DW_SESSION
+
+RUN apt update && apt install -y --no-install-recommends \
+        nginx supervisor memcached ca-certificates curl \
+    && rm -f /etc/nginx/sites-enabled/default \
+    && mkdir -p /var/www/html /var/log/nginx /var/log/supervisor \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN install-php-extensions apcu sockets memcached \
     && echo "apc.enable_cli=1" >> /usr/local/etc/php/conf.d/docker-php-ext-apcu.ini
 
-# download pre-built WebsocketServer binary & logger
-RUN curl -sL "https://github.com/nosial/WebsocketServer/releases/latest/download/websocket-server-linux-x86_64" -o /usr/bin/wss && \
-    curl -sL "https://github.com/nosial/LogLib2Server/releases/latest/download/LogLib2Server-linux-x86_64" -o /usr/bin/ll2s && \
-    chmod +x /usr/bin/wss && chmod +x /usr/bin/ll2s  && apt purge -y --auto-remove curl
+RUN curl -sL "https://github.com/nosial/WebsocketServer/releases/latest/download/websocket-server-linux-x86_64" -o /usr/bin/wss \
+    && curl -sL "https://github.com/nosial/LogLib2Server/releases/latest/download/LogLib2Server-linux-x86_64" -o /usr/bin/ll2s \
+    && chmod +x /usr/bin/wss /usr/bin/ll2s \
+    && apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
-
-# Create required directories
-RUN mkdir -p /var/www/html /var/log/nginx /var/log/supervisor
-
-# Remove default nginx site
-RUN rm -f /etc/nginx/sites-enabled/default
-
-# Copy configuration files
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-# Copy default application files
 COPY index.php /var/www/html/index.php
-
-# Copy and configure entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/
+
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 WORKDIR /var/www/html
