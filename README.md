@@ -60,6 +60,18 @@ to create web applications with PHP and deploy them using ncc.
   * [Built-in Pages](#built-in-pages)
   * [APCu Caching](#apcu-caching)
   * [Cookies](#cookies)
+  * [Cookie Sessions](#cookie-sessions)
+    * [Configuration](#configuration-2)
+    * [Basic Usage](#basic-usage)
+    * [Updating Session Data](#updating-session-data)
+    * [Destroying a Session](#destroying-a-session)
+    * [Cookie Parameters](#cookie-parameters)
+    * [Multiple Session Cookies](#multiple-session-cookies)
+    * [CookieSession API](#cookiesession-api)
+    * [WebSession API](#websession-api)
+    * [Security](#security)
+    * [Advanced Usage via CookieSessionManager](#advanced-usage-via-cookiesessionmanager)
+    * [Docker Deployment](#docker-deployment)
   * [Deployment](#deployment-1)
     * [Docker](#docker)
     * [Nginx Configuration](#nginx-configuration)
@@ -1551,23 +1563,23 @@ The `WebSocket` object is accessible via `WebSession::getWebSocket()` and provid
 communicating over the WebSocket connection. All data is transmitted as raw binary over the TCP bridge — the
 WebsocketServer handles encoding/decoding WebSocket frames.
 
-| Method                                            | Return Type     | Description                                                                                                  |
-|---------------------------------------------------|-----------------|--------------------------------------------------------------------------------------------------------------|
-| `getConnection()`                                 | `?Connection`   | Returns the connection metadata object populated from `WSS_*` environment variables                          |
-| `getMetadata()`                                   | `array`         | Returns the connection metadata as an associative array                                                      |
-| `send(string $data, int $chunkSize=65536)`        | `bool`          | Sends raw data to the WebSocket client. Returns `false` if the connection is closed or the payload exceeds `maxPayloadSize` |
-| `read(int $length=8192)`                          | `?string`       | Reads raw data from the WebSocket client. Returns `null` on connection close or timeout                      |
-| `readAll(int $chunkSize=65536, int $maxLength=0, float $idleTimeout=0)` | `?string` | Reads all available data until connection closes, max length reached, or idle timeout expires            |
-| `sendAndReceive(string $data, float $timeout=5.0, int $chunkSize=8192)` | `?string` | Sends data and waits for a response using kernel-level polling (`stream_select`)                         |
-| `readLine()`                                      | `?string`       | Reads a line of data (terminated by `\r\n`, `\n`, or `\r`) from the socket                                 |
-| `setTimeout(float $seconds)`                      | `void`          | Sets the read timeout on the underlying socket                                                               |
-| `setMaxPayloadSize(int $bytes)`                   | `void`          | Limits the maximum payload size for `send()` and `read()` operations                                        |
-| `isConnected()`                                   | `bool`          | Returns `true` if the connection is still alive and not timed out                                            |
-| `getSocket()`                                     | `resource\|null`| Returns the raw PHP socket resource for advanced use                                                         |
-| `getState()`                                      | `array`         | Returns diagnostic state: `connected`, `closed`, `timed_out`, `bytes_sent`, `bytes_received`                |
-| `getBytesSent()`                                  | `int`           | Returns the total number of bytes sent over this connection                                                 |
-| `getBytesReceived()`                              | `int`           | Returns the total number of bytes received over this connection                                             |
-| `close()`                                         | `void`          | Closes the connection                                                                                        |
+| Method                                                                  | Return Type      | Description                                                                                                                 |
+|-------------------------------------------------------------------------|------------------|-----------------------------------------------------------------------------------------------------------------------------|
+| `getConnection()`                                                       | `?Connection`    | Returns the connection metadata object populated from `WSS_*` environment variables                                         |
+| `getMetadata()`                                                         | `array`          | Returns the connection metadata as an associative array                                                                     |
+| `send(string $data, int $chunkSize=65536)`                              | `bool`           | Sends raw data to the WebSocket client. Returns `false` if the connection is closed or the payload exceeds `maxPayloadSize` |
+| `read(int $length=8192)`                                                | `?string`        | Reads raw data from the WebSocket client. Returns `null` on connection close or timeout                                     |
+| `readAll(int $chunkSize=65536, int $maxLength=0, float $idleTimeout=0)` | `?string`        | Reads all available data until connection closes, max length reached, or idle timeout expires                               |
+| `sendAndReceive(string $data, float $timeout=5.0, int $chunkSize=8192)` | `?string`        | Sends data and waits for a response using kernel-level polling (`stream_select`)                                            |
+| `readLine()`                                                            | `?string`        | Reads a line of data (terminated by `\r\n`, `\n`, or `\r`) from the socket                                                  |
+| `setTimeout(float $seconds)`                                            | `void`           | Sets the read timeout on the underlying socket                                                                              |
+| `setMaxPayloadSize(int $bytes)`                                         | `void`           | Limits the maximum payload size for `send()` and `read()` operations                                                        |
+| `isConnected()`                                                         | `bool`           | Returns `true` if the connection is still alive and not timed out                                                           |
+| `getSocket()`                                                           | `resource\|null` | Returns the raw PHP socket resource for advanced use                                                                        |
+| `getState()`                                                            | `array`          | Returns diagnostic state: `connected`, `closed`, `timed_out`, `bytes_sent`, `bytes_received`                                |
+| `getBytesSent()`                                                        | `int`            | Returns the total number of bytes sent over this connection                                                                 |
+| `getBytesReceived()`                                                    | `int`            | Returns the total number of bytes received over this connection                                                             |
+| `close()`                                                               | `void`           | Closes the connection                                                                                                       |
 
 The `Connection` object provides the following accessors for the connection metadata:
 
@@ -1788,6 +1800,307 @@ The `Cookie` object has the following properties:
 | `domain`   | `string` | `""`    | The domain that the cookie is available to, empty string means current domain               |
 | `secure`   | `bool`   | `false` | When True, the cookie will only be transmitted over HTTPS connections                       |
 | `httpOnly` | `bool`   | `false` | When True, the cookie is not accessible via JavaScript (`document.cookie`)                  |
+
+
+## Cookie Sessions
+
+Cookie Sessions provide server-side session storage using Memcached, allowing you to persist arbitrary data across
+requests securely. The session data is stored on the server while only a session identifier is sent to the client
+via a cookie. This prevents client-side tampering and enables secure storage of sensitive data like authentication
+status and user identifiers.
+
+Cookie Sessions are disabled by default. To enable them, set the `MEMCACHED_ENABLED` environment variable to `1`
+and ensure Memcached is running.
+
+### Configuration
+
+Cookie Sessions are configured exclusively through environment variables:
+
+| Variable                       | Default              | Description                                                    |
+|--------------------------------|----------------------|----------------------------------------------------------------|
+| `MEMCACHED_ENABLED`            | —                    | Set to `1`, `true`, `yes`, or `on` to enable                   |
+| `MEMCACHED_HOST`               | `127.0.0.1`          | Memcached server host                                          |
+| `MEMCACHED_PORT`               | `11211`              | Memcached server port                                          |
+| `MEMCACHED_SESSION_TTL`        | `3600`               | Session time-to-live in seconds                                |
+| `MEMCACHED_SESSION_SECRET`     | *(internal default)* | HMAC secret key used for fingerprint verification              |
+
+
+### Basic Usage
+
+The `WebSession` class provides convenience static methods for interacting with cookie sessions:
+
+```php
+<?php
+    use DynamicalWeb\WebSession;
+
+    // Check if the manager is available (Memcached enabled and connected)
+    $manager = WebSession::getCookieSessionManager();
+    if ($manager === null)
+    {
+        // Memcached is not available
+        return;
+    }
+
+    // Check if a session already exists (from the request cookie)
+    if (WebSession::hasCookieSession('session'))
+    {
+        $session = WebSession::getCookieSession('session');
+
+        $userId = $session->get('user_id');
+        $authenticated = $session->get('authenticated', false);
+    }
+    else
+    {
+        // Create a new session with initial data
+        $session = WebSession::createCookieSession([
+            'authenticated' => false,
+            'user_id' => 0,
+            'created_at' => time(),
+        ]);
+
+        // The session cookie is automatically set in the response
+    }
+?>
+```
+
+### Updating Session Data
+
+You can modify session data using the `CookieSession` object and persist changes with `saveCookieSession()`:
+
+```php
+<?php
+    use DynamicalWeb\WebSession;
+
+    $session = WebSession::getCookieSession();
+
+    if ($session !== null)
+    {
+        // Update values
+        $session->set('authenticated', true);
+        $session->set('user_id', 42);
+        $session->set('last_activity', time());
+
+        // Remove a value
+        $session->remove('temporary_data');
+
+        // Check if a key exists
+        if ($session->has('user_role'))
+        {
+            $role = $session->get('user_role');
+        }
+
+        // Persist changes to Memcached
+        WebSession::saveCookieSession($session);
+    }
+?>
+```
+
+### Destroying a Session
+
+To log a user out or clear their session:
+
+```php
+<?php
+    use DynamicalWeb\WebSession;
+
+    WebSession::destroyCookieSession();
+    // The session is removed from Memcached and the cookie is expired
+?>
+```
+
+### Cookie Parameters
+
+When creating or destroying a session, you can control the cookie attributes via optional parameters.
+All parameters have sensible defaults, so you only need to specify what you want to override:
+
+| Parameter      | Type      | Default        | Description                                                       |
+|----------------|-----------|----------------|-------------------------------------------------------------------|
+| `$cookieName`  | `?string` | `null`         | Cookie name (falls back to `web_session`)                         |
+| `$path`        | `string`  | `"/"`          | Cookie path                                                       |
+| `$domain`      | `string`  | `""`           | Cookie domain (empty = current domain)                            |
+| `$secure`      | `?bool`   | `null`         | HTTPS-only flag (`null` = auto-detect from request)               |
+| `$httpOnly`    | `bool`    | `true`         | HTTP-only flag (prevents JavaScript access)                       |
+| `$sameSite`    | `string`  | `"Lax"`        | SameSite attribute (`None`, `Lax`, or `Strict`)                   |
+
+For `destroyCookieSession()` only `$cookieName`, `$path` and `$domain` are available, as these must match
+the values used when the cookie was originally set to properly expire it.
+
+```php
+<?php
+    use DynamicalWeb\WebSession;
+
+    // Create a session scoped to /admin/ with Strict SameSite
+    $session = WebSession::createCookieSession(
+        data: ['role' => 'admin'],
+        cookieName: 'ADMIN_SESSION',
+        path: '/admin',
+        secure: true,
+        sameSite: 'Strict'
+    );
+
+    // Destroy it using matching cookie parameters
+    WebSession::destroyCookieSession(
+        cookieName: 'ADMIN_SESSION',
+        path: '/admin'
+    );
+?>
+```
+
+### Multiple Session Cookies
+
+You can manage multiple independent session cookies by passing a `$cookieName` argument to the session methods.
+This is useful when you need separate sessions for different concerns, such as authentication and shopping cart:
+
+```php
+<?php
+    use DynamicalWeb\WebSession;
+
+    // Authentication session
+    if (!WebSession::hasCookieSession('AUTH_SESSION'))
+    {
+        WebSession::createCookieSession(
+            ['authenticated' => false],
+            'AUTH_SESSION'
+        );
+    }
+
+    $authSession = WebSession::getCookieSession('AUTH_SESSION');
+
+    // Shopping cart session
+    if (!WebSession::hasCookieSession('CART_SESSION'))
+    {
+        WebSession::createCookieSession(
+            ['items' => [], 'total' => 0],
+            'CART_SESSION'
+        );
+    }
+
+    $cartSession = WebSession::getCookieSession('CART_SESSION');
+
+    // Each session stores data independently in Memcached
+    $authSession->set('authenticated', true);
+    $authSession->set('user_id', 42);
+    WebSession::saveCookieSession($authSession);
+
+    $cartSession->set('items', ['product_1', 'product_2']);
+    WebSession::saveCookieSession($cartSession);
+
+    // Destroy only the auth session
+    WebSession::destroyCookieSession('AUTH_SESSION');
+?>
+```
+
+### CookieSession API
+
+The `CookieSession` object provides the following methods:
+
+| Method                              | Return Type | Description                                                          |
+|-------------------------------------|-------------|----------------------------------------------------------------------|
+| `getSessionId()`                    | `string`    | Returns the unique session identifier                                |
+| `getData()`                         | `array`     | Returns all session data as an associative array                     |
+| `getExpires()`                      | `int`       | Returns the Unix timestamp when the session expires                  |
+| `set(string $key, mixed $value)`    | `void`      | Sets a value in the session data                                     |
+| `get(string $key, mixed $default)`  | `mixed`     | Gets a value from the session data, or the default if not found      |
+| `has(string $key)`                  | `bool`      | Checks if a key exists in the session data                           |
+| `remove(string $key)`               | `void`      | Removes a key from the session data                                  |
+
+### WebSession API
+
+| Method                                                                                                         | Return Type             | Description                                                    |
+|----------------------------------------------------------------------------------------------------------------|-------------------------|----------------------------------------------------------------|
+| `getCookieSessionManager()`                                                                                    | `?CookieSessionManager` | Returns the manager if Memcached is enabled and connected      |
+| `hasCookieSession(?string $cookieName = null)`                                                                 | `bool`                  | Returns true if a valid session exists for the current request |
+| `getCookieSession(?string $cookieName = null)`                                                                 | `?CookieSession`        | Retrieves the current session (with fingerprint verification)  |
+| `createCookieSession(array $data, ?string $cookieName, string $path, string $domain, ?bool $secure, bool $httpOnly, string $sameSite)` | `?CookieSession`        | Creates a new session and sets the session cookie              |
+| `saveCookieSession(CookieSession $session)`                                                                    | `bool`                  | Persists session changes to Memcached                          |
+| `destroyCookieSession(?string $cookieName, string $path, string $domain)`                                      | `bool`                  | Deletes the session from Memcached and expires the cookie      |
+
+### Security
+
+Cookie Sessions include built-in protection against session hijacking:
+
+- **Session ID Generation** — Session IDs are generated using `random_bytes(32)`, producing 64-character
+  hexadecimal strings that are cryptographically secure
+- **Fingerprint Verification** — Each session stores an HMAC-SHA256 fingerprint computed from the client's IP
+  address and User-Agent string. On every `getSession()` call, the fingerprint is verified against the current
+  request. If the fingerprint does not match, the session is immediately deleted from Memcached and the cookie
+  is expired, mitigating session hijacking attempts
+- **HttpOnly Cookies** — The session cookie is set with the `HttpOnly` flag, preventing client-side JavaScript
+  from accessing the session identifier
+- **Secure Cookies** — The session cookie is marked `Secure` when the request is made over HTTPS
+- **TTL Refresh** — The session TTL is refreshed on every access via `Memcached::touch()`, keeping active
+  sessions alive while expired sessions are automatically cleaned up by Memcached
+
+### Advanced Usage via CookieSessionManager
+
+For advanced use cases, you can interact with the `CookieSessionManager` directly:
+
+```php
+<?php
+    use DynamicalWeb\WebSession;
+
+    $manager = WebSession::getCookieSessionManager();
+
+    if ($manager !== null)
+    {
+        // Access configuration
+        $cookieName = $manager->getCookieName();
+        $ttl = $manager->getSessionTtl();
+
+        // Check session cookie presence without loading the session
+        if ($manager->hasSessionCookie())
+        {
+            $sessionId = $manager->getSessionIdFromCookie();
+        }
+
+        // Use a custom cookie name for a specific session
+        if ($manager->hasSessionCookie('CART_SESSION'))
+        {
+            $cartSession = $manager->getSession('CART_SESSION');
+        }
+
+        // Check if a session exists in Memcached without loading it
+        if ($manager->sessionExists())
+        {
+            // Session exists in the cache
+        }
+    }
+?>
+```
+
+The `CookieSessionManager` provides the following methods:
+
+| Method                                                                                                               | Return Type      | Description                                                        |
+|----------------------------------------------------------------------------------------------------------------------|------------------|--------------------------------------------------------------------|
+| `isEnabled()`                                                                                                        | `bool`           | Returns true if Memcached is available and connected               |
+| `getCookieName()`                                                                                                    | `string`         | Returns the configured session cookie name                         |
+| `getSessionTtl()`                                                                                                    | `int`            | Returns the configured session TTL in seconds                      |
+| `hasSessionCookie(?string $cookieName = null)`                                                                       | `bool`           | Checks if the session cookie exists in the current request         |
+| `getSessionIdFromCookie(?string $cookieName = null)`                                                                 | `?string`        | Returns the session ID from the request cookie, or null            |
+| `getSession(?string $cookieName = null)`                                                                             | `?CookieSession` | Retrieves the session from Memcached with fingerprint verification |
+| `sessionExists(?string $cookieName = null)`                                                                          | `bool`           | Checks if the session exists in Memcached without loading it       |
+| `createSession(array $data, ?string $cookieName, string $path, string $domain, ?bool $secure, bool $httpOnly, string $sameSite)` | `?CookieSession` | Creates a new session and sets the cookie in the response          |
+| `saveSession(CookieSession $session)`                                                                                | `bool`           | Persists the session data to Memcached                             |
+| `destroySession(?string $cookieName, string $path, string $domain)`                                                   | `bool`           | Deletes the session and expires the cookie                         |
+| `deleteSession(string $sessionId)`                                                                                   | `bool`           | Deletes a specific session by its ID                               |
+
+### Docker Deployment
+
+When using the provided Docker image, Memcached is already installed and configured to start automatically via
+Supervisor. The `MEMCACHED_*` environment variables can be set in your `docker-compose.yml` or container
+environment to configure session behaviour:
+
+```yaml
+# docker-compose.yml
+services:
+  app:
+    image: your-app:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - MEMCACHED_ENABLED=1
+      - MEMCACHED_SESSION_TTL=7200
+```
 
 
 ## Deployment
