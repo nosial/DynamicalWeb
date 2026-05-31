@@ -3,10 +3,12 @@
     namespace DynamicalWeb;
 
     use DynamicalWeb\Classes\Apcu;
+    use DynamicalWeb\Classes\CookieSessionManager;
     use DynamicalWeb\Classes\Logger;
     use DynamicalWeb\Classes\Router;
     use DynamicalWeb\Exceptions\LocaleException;
     use DynamicalWeb\Exceptions\WebSocketException;
+    use DynamicalWeb\Objects\CookieSession;
     use DynamicalWeb\Objects\Locale;
     use DynamicalWeb\Objects\Request;
     use DynamicalWeb\Objects\Response;
@@ -27,8 +29,9 @@
         private static ?Locale $locale=null;
         private static ?Throwable $exception=null;
         private static ?WebSocket $websocket=null;
-        private static array $localeFileCache = [];
+        private static array $localeFileCache=[];
         private static ?array $variables;
+        private static ?CookieSessionManager $cookieSessionManager=null;
 
         /**
          * Starts the web session instance with the provided DynamicalWeb instance.
@@ -105,6 +108,7 @@
             self::$locale = null;
             self::$exception = null;
             self::$variables = null;
+            self::$cookieSessionManager = null;
         }
 
         /**
@@ -256,6 +260,104 @@
             {
                 unset(self::$variables[$key]);
             }
+        }
+
+        /**
+         * Returns the CookieSessionManager instance if cookie sessions are enabled, or null if not.
+         * The manager is lazily initialized on first access and cached for subsequent calls.
+         *
+         * @return CookieSessionManager|null
+         */
+        public static function getCookieSessionManager(): ?CookieSessionManager
+        {
+            if (self::$cookieSessionManager === null)
+            {
+                self::$cookieSessionManager = new CookieSessionManager();
+            }
+
+            return self::$cookieSessionManager->isEnabled() ? self::$cookieSessionManager : null;
+        }
+
+        /**
+         * Checks if a valid cookie session exists for the current request.
+         *
+         * @return bool True if a valid cookie session exists, false otherwise.
+         */
+        public static function hasCookieSession(): bool
+        {
+            $manager = self::getCookieSessionManager();
+            if ($manager === null)
+            {
+                return false;
+            }
+
+            return $manager->hasSessionCookie() && $manager->getSession() !== null;
+        }
+
+        /**
+         * Retrieves the current cookie session for the request, or null if no valid session exists.
+         *
+         * @return CookieSession|null The current cookie session, or null if not found or invalid.
+         */
+        public static function getCookieSession(): ?CookieSession
+        {
+            $manager = self::getCookieSessionManager();
+            if ($manager === null)
+            {
+                return null;
+            }
+
+            return $manager->getSession();
+        }
+
+        /**
+         * Creates a new cookie session with the provided data and returns it.
+         *
+         * @param array $data Optional associative array of data to store in the session.
+         * @return CookieSession|null The newly created cookie session, or null if cookie sessions are not enabled.
+         */
+        public static function createCookieSession(array $data = []): ?CookieSession
+        {
+            $manager = self::getCookieSessionManager();
+            if ($manager === null)
+            {
+                return null;
+            }
+
+            return $manager->createSession($data);
+        }
+
+        /**
+         * Saves the provided cookie session data and updates the session cookie in the response.
+         *
+         * @param CookieSession $session The cookie session to save.
+         * @return bool True if the session was successfully saved, false otherwise.
+         */
+        public static function saveCookieSession(CookieSession $session): bool
+        {
+            $manager = self::getCookieSessionManager();
+            if ($manager === null)
+            {
+                return false;
+            }
+
+            return $manager->saveSession($session);
+        }
+
+        /**
+         * Destroys the current cookie session by removing it from storage and clearing the session cookie.
+         *
+         * @return bool True if the session was successfully destroyed, false otherwise.
+         */
+        public static function destroyCookieSession(): bool
+        {
+            $manager = self::getCookieSessionManager();
+            if ($manager === null)
+            {
+                return false;
+            }
+
+            return $manager->destroySession();
         }
 
         /**
