@@ -39,9 +39,7 @@ ENV LOGLIB_CONSOLE_ENABLED=false \
     MEMCACHED_ENABLED=0 \
     MEMCACHED_HOST=127.0.0.1 \
     MEMCACHED_PORT=11211 \
-    MEMCACHED_SESSION_TTL=3600 \
-    MEMCACHED_SESSION_PREFIX=dw_sess_ \
-    MEMCACHED_SESSION_COOKIE=DW_SESSION
+    MEMCACHED_SESSION_TTL=3600
 
 RUN apt update && apt install -y --no-install-recommends \
         nginx supervisor memcached ca-certificates curl \
