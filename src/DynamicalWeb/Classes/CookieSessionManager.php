@@ -201,7 +201,7 @@
             $session = new CookieSession($sessionId, $data, $expires, $fingerprint);
             if ($this->storeSession($session))
             {
-                $this->setSessionCookie($sessionId, $expires, $cookieName, $path, $domain, $secure, $httpOnly, $sameSite);
+                $this->setSessionCookie($sessionId, $expires, $cookieName, $path, $domain, $secure, $httpOnly);
                 return $session;
             }
 
@@ -358,9 +358,8 @@
          * @param string $domain The cookie domain. Defaults to '' (current domain).
          * @param bool|null $secure Whether the cookie should only be sent over HTTPS. Null = auto-detect from request.
          * @param bool $httpOnly Whether the cookie should be accessible only via HTTP. Defaults to true.
-         * @param string $sameSite The SameSite attribute (None, Lax, or Strict). Defaults to 'Lax'.
          */
-        private function setSessionCookie(string $sessionId, int $expires, ?string $cookieName = null, string $path = '/', string $domain = '', ?bool $secure = null, bool $httpOnly = true, string $sameSite = 'Lax'): void
+        private function setSessionCookie(string $sessionId, int $expires, ?string $cookieName = null, string $path = '/', string $domain = '', ?bool $secure = null, bool $httpOnly = true): void
         {
             $response = WebSession::getResponse();
             if ($response === null)
