@@ -281,9 +281,10 @@
         /**
          * Checks if a valid cookie session exists for the current request.
          *
+         * @param string|null $cookieName Optional cookie name to check. Defaults to the configured cookie name.
          * @return bool True if a valid cookie session exists, false otherwise.
          */
-        public static function hasCookieSession(): bool
+        public static function hasCookieSession(?string $cookieName = null): bool
         {
             $manager = self::getCookieSessionManager();
             if ($manager === null)
@@ -291,15 +292,16 @@
                 return false;
             }
 
-            return $manager->hasSessionCookie() && $manager->getSession() !== null;
+            return $manager->hasSessionCookie($cookieName) && $manager->getSession($cookieName) !== null;
         }
 
         /**
          * Retrieves the current cookie session for the request, or null if no valid session exists.
          *
+         * @param string|null $cookieName Optional cookie name to read. Defaults to the configured cookie name.
          * @return CookieSession|null The current cookie session, or null if not found or invalid.
          */
-        public static function getCookieSession(): ?CookieSession
+        public static function getCookieSession(?string $cookieName=null): ?CookieSession
         {
             $manager = self::getCookieSessionManager();
             if ($manager === null)
@@ -307,16 +309,22 @@
                 return null;
             }
 
-            return $manager->getSession();
+            return $manager->getSession($cookieName);
         }
 
         /**
          * Creates a new cookie session with the provided data and returns it.
          *
          * @param array $data Optional associative array of data to store in the session.
+         * @param string|null $cookieName Optional cookie name to set. Defaults to the configured cookie name.
+         * @param string $path The cookie path. Defaults to '/'.
+         * @param string $domain The cookie domain. Defaults to '' (current domain).
+         * @param bool|null $secure Whether the cookie should only be sent over HTTPS. Null = auto-detect from request.
+         * @param bool $httpOnly Whether the cookie should be accessible only via HTTP. Defaults to true.
+         * @param string $sameSite The SameSite attribute (None, Lax, or Strict). Defaults to 'Lax'.
          * @return CookieSession|null The newly created cookie session, or null if cookie sessions are not enabled.
          */
-        public static function createCookieSession(array $data = []): ?CookieSession
+        public static function createCookieSession(array $data = [], ?string $cookieName = null, string $path = '/', string $domain = '', ?bool $secure = null, bool $httpOnly = true, string $sameSite = 'Lax'): ?CookieSession
         {
             $manager = self::getCookieSessionManager();
             if ($manager === null)
@@ -324,7 +332,7 @@
                 return null;
             }
 
-            return $manager->createSession($data);
+            return $manager->createSession($data, $cookieName, $path, $domain, $secure, $httpOnly, $sameSite);
         }
 
         /**
@@ -345,11 +353,14 @@
         }
 
         /**
-         * Destroys the current cookie session by removing it from storage and clearing the session cookie.
+         * Destroys the current cookie session and removes the session cookie from the response.
          *
+         * @param string|null $cookieName Optional cookie name to read and expire. Defaults to the configured cookie name.
+         * @param string $path The cookie path used when the session was created. Defaults to '/'.
+         * @param string $domain The cookie domain used when the session was created. Defaults to ''.
          * @return bool True if the session was successfully destroyed, false otherwise.
          */
-        public static function destroyCookieSession(): bool
+        public static function destroyCookieSession(?string $cookieName = null, string $path = '/', string $domain = ''): bool
         {
             $manager = self::getCookieSessionManager();
             if ($manager === null)
@@ -357,7 +368,7 @@
                 return false;
             }
 
-            return $manager->destroySession();
+            return $manager->destroySession($cookieName, $path, $domain);
         }
 
         /**
