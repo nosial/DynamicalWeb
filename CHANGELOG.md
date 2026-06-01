@@ -8,10 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.12] - 2026-06-01
 
-Update `WebSession::endSession` to properly end the request rather than just clearing up the session data. This method
-now sends the response and optionally terminates the script executing if the `$exitCode` parameter is not null and is an
-integer.
-
+### Changed
+ - Updated `WebSession::endSession` to properly end the request rather than just clearing up the session data. This method
+   now sends the response and optionally terminates the script executing if the `$exitCode` parameter is not null and is
+   an integer.
+ - Updated Dockerfile to include a health check.
 
 
 ## [1.0.11] - 2025-05-31
