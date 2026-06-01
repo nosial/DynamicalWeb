@@ -337,19 +337,10 @@
                     {
                         // Debug panel injection failed, proceed to send response
                     }
-
-                    try
-                    {
-                        $response = WebSession::getResponse();
-                        if ($response !== null)
-                        {
-                            $response->send();
-                        }
-                    }
-                    catch (Throwable)
-                    {
-                        // Response sending failed
-                    }
+                }
+                else
+                {
+                    WebSession::setResponse(null);
                 }
 
                 WebSession::endSession();

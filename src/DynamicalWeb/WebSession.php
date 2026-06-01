@@ -86,10 +86,29 @@
         }
 
         /**
-         * Ends the session by clearing all static state.
+         * Ends the session by sending the response (if available), closing the WebSocket connection,
+         * and clearing all static state. If an exit code is provided, the process will exit after cleanup.
+         *
+         * @param int|null $exitCode Optional exit code. When null, the process continues (no exit).
+         *                           When set to an integer, the process exits with that code after cleanup.
          */
-        public static function endSession(): void
+        public static function endSession(?int $exitCode = null): void
         {
+            // Send response if available
+            if (self::$response !== null)
+            {
+                try
+                {
+                    self::$response->send();
+                }
+                catch (Throwable)
+                {
+                    // Response sending failed, proceed with cleanup
+                }
+
+                self::$response = null;
+            }
+
             if (self::$websocket !== null)
             {
                 if (self::$websocket->isConnected())
@@ -102,13 +121,17 @@
 
             self::$instance = null;
             self::$request = null;
-            self::$response = null;
             self::$module = null;
             self::$currentRoute = null;
             self::$locale = null;
             self::$exception = null;
             self::$variables = null;
             self::$cookieSessionManager = null;
+
+            if ($exitCode !== null)
+            {
+                exit($exitCode);
+            }
         }
 
         /**
@@ -139,6 +162,16 @@
         public static function getResponse(): ?Response
         {
             return self::$response;
+        }
+
+        /**
+         * Sets the Response object for the current web session.
+         *
+         * @param Response|null $response The Response object to set, or null to clear.
+         */
+        public static function setResponse(?Response $response): void
+        {
+            self::$response = $response;
         }
 
         /**
