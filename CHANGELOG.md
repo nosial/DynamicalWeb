@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.12] - 2026-06-01
 
-This is an ongoing update
+This update introduces some minor improvements and changes to the project
 
 ### Changed
  - Updated `WebSession::endSession` to properly end the request rather than just clearing up the session data. This method
