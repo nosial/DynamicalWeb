@@ -267,15 +267,20 @@
                     return;
                 }
 
-                $preRequests = $this->webConfiguration->getApplication()->getPreRequest();
-                if($preRequests !== null && count($preRequests) > 0)
+                $currentRoute = WebSession::getCurrentRoute();
+
+                if ($currentRoute !== null)
                 {
-                    foreach($preRequests as $preRequestModule)
+                    $preRequests = $this->webConfiguration->getApplication()->getPreRequest();
+                    if($preRequests !== null && count($preRequests) > 0)
                     {
-                        $preRequestModulePath = $this->buildModulePath($preRequestModule);
-                        if (file_exists($preRequestModulePath))
+                        foreach($preRequests as $preRequestModule)
                         {
-                            ExecutionHandler::executePhp($preRequestModulePath);
+                            $preRequestModulePath = $this->buildModulePath($preRequestModule);
+                            if (file_exists($preRequestModulePath))
+                            {
+                                ExecutionHandler::executePhp($preRequestModulePath);
+                            }
                         }
                     }
                 }
@@ -296,16 +301,18 @@
                     $this->executeModule($modulePath);
                 }
 
-
-                $postRequests = $this->webConfiguration->getApplication()->getPostRequest();
-                if($postRequests !== null && count($postRequests) > 0)
+                if ($currentRoute !== null)
                 {
-                    foreach($postRequests as $postRequestModule)
+                    $postRequests = $this->webConfiguration->getApplication()->getPostRequest();
+                    if($postRequests !== null && count($postRequests) > 0)
                     {
-                        $postRequestModulePath = $this->buildModulePath($postRequestModule);
-                        if (file_exists($postRequestModulePath))
+                        foreach($postRequests as $postRequestModule)
                         {
-                            ExecutionHandler::executePhp($postRequestModulePath);
+                            $postRequestModulePath = $this->buildModulePath($postRequestModule);
+                            if (file_exists($postRequestModulePath))
+                            {
+                                ExecutionHandler::executePhp($postRequestModulePath);
+                            }
                         }
                     }
                 }
@@ -351,15 +358,20 @@
         {
             Logger::getLogger()->info('WebSocket request detected, executing WebSocket handler');
 
-            $preRequests = $this->webConfiguration->getApplication()->getPreRequest();
-            if($preRequests !== null && count($preRequests) > 0)
+            $currentRoute = WebSession::getCurrentRoute();
+
+            if ($currentRoute !== null)
             {
-                foreach($preRequests as $preRequestModule)
+                $preRequests = $this->webConfiguration->getApplication()->getPreRequest();
+                if($preRequests !== null && count($preRequests) > 0)
                 {
-                    $preRequestModulePath = $this->buildModulePath($preRequestModule);
-                    if (file_exists($preRequestModulePath))
+                    foreach($preRequests as $preRequestModule)
                     {
-                        ExecutionHandler::executePhp($preRequestModulePath);
+                        $preRequestModulePath = $this->buildModulePath($preRequestModule);
+                        if (file_exists($preRequestModulePath))
+                        {
+                            ExecutionHandler::executePhp($preRequestModulePath);
+                        }
                     }
                 }
             }
@@ -398,15 +410,18 @@
                 }
             }
 
-            $postRequests = $this->webConfiguration->getApplication()->getPostRequest();
-            if($postRequests !== null && count($postRequests) > 0)
+            if ($currentRoute !== null)
             {
-                foreach($postRequests as $postRequestModule)
+                $postRequests = $this->webConfiguration->getApplication()->getPostRequest();
+                if($postRequests !== null && count($postRequests) > 0)
                 {
-                    $postRequestModulePath = $this->buildModulePath($postRequestModule);
-                    if (file_exists($postRequestModulePath))
+                    foreach($postRequests as $postRequestModule)
                     {
-                        ExecutionHandler::executePhp($postRequestModulePath);
+                        $postRequestModulePath = $this->buildModulePath($postRequestModule);
+                        if (file_exists($postRequestModulePath))
+                        {
+                            ExecutionHandler::executePhp($postRequestModulePath);
+                        }
                     }
                 }
             }

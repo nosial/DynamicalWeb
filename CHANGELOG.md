@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.14] - Ongoing
 
+This update introduces some minor improvements and changes to the project
+
+### Changed
+ - Pre-Request and Post-Request event handlers will no longer execute for resource files, instead only executing modules.
+
 
 
 ## [1.0.13] - 2026-06-01
