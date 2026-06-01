@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 This update introduces some minor improvements and changes to the project
 
+### Added
+ - Added PhpDoc to WebSocket
+
 ### Changed
  - Pre-Request and Post-Request event handlers will no longer execute for resource files, instead only executing modules.
 
