@@ -95,6 +95,24 @@
          */
         public static function printRoute(string $id, array $pathVariables = [], array $queryParams = []): void
         {
+            print(self::getRouteUrl($id, $pathVariables, $queryParams));
+        }
+
+        /**
+         * Generates a fully-qualified URL for a named route.
+         *
+         * Resolves the route by its ID, builds the URL from the automatically detected base URL
+         * (scheme + host from the current request) and base_path, substitutes any {variable} placeholders in the route
+         * path with values from $pathVariables, and appends optional GET query parameters.
+         *
+         * @param string $id The route ID as defined in the web configuration.
+         * @param array $pathVariables Associative array of path variable substitutions (e.g. ['id' => '42']).
+         * @param array $queryParams Associative array of query strigng parameters to append (e.g. ['page' => '2']).
+         * @return string The generated URL for the specified route
+         * @throws RuntimeException Thrown if the route cannot be resolved
+         */
+        public static function getRouteUrl(string $id, array $pathVariables = [], array $queryParams = []): string
+        {
             $instance = WebSession::getInstance();
             if ($instance === null)
             {
@@ -128,7 +146,7 @@
                 $url .= '?' . http_build_query($queryParams);
             }
 
-            print($url);
+            return $url;
         }
 
         /**
