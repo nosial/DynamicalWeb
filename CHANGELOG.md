@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.16] - Ongoing
 
+This update introduces the new version of the ncc compiler
 
 
 
