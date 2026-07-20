@@ -46,6 +46,7 @@ to create web applications with PHP and deploy them using ncc.
     * [Locale Files](#locale-files)
     * [Locale Detection](#locale-detection)
     * [Using Locales in Templates](#using-locales-in-templates)
+      * [Global Section](#global-section)
   * [Static Resources](#static-resources)
   * [Pre and Post Request Scripts](#pre-and-post-request-scripts)
   * [WebSocket Support](#websocket-support)
@@ -1304,6 +1305,40 @@ locale context (determined by the route's `locale_id`, the `$localizationId` pas
 The placeholder replacement uses curly braces `{key}` syntax in the locale strings, for example a locale string
 `"Hello {name}, you have {count} messages"` with replacements `['name' => 'John', 'count' => 5]` will produce
 `"Hello John, you have 5 messages"`.
+
+#### Global Section
+
+DynamicalWeb supports a special `global` locale section that makes its labels available across all other sections.
+When a label is not found in the active section, the system automatically falls back to the `global` section.
+This allows you to define shared labels (e.g., site name, common buttons, footer text) once and use them from
+any locale context without duplication:
+
+```yaml
+# en.yml
+global:
+  site_name: "My Application"
+  page_title: "My App"
+  learn_more: "Learn More"
+  copyright: "Copyright © {year} {company}. All rights reserved."
+
+home:
+  page_title: "Welcome Home"
+  jumbotron_text: "Build web applications with ease"
+
+about:
+  page_title: "About Us"
+  heading: "About Our Application"
+```
+
+In the above example, `site_name` and `learn_more` are defined only in `global` but can be used from any section.
+The `page_title` key is defined in both `global` and the individual sections — the section-specific value takes
+priority, so when the `home` section is active, `page_title` resolves to `"Welcome Home"`, not `"My App"`.
+
+```phtml
+<!-- Works from any section context -->
+<?php Functions::printl('site_name'); ?>
+<?php Functions::printl('copyright', ['year' => '2026', 'company' => 'Nosial']); ?>
+```
 
 You can also access the locale object directly from the `WebSession` for more advanced use cases:
 
