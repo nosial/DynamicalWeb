@@ -43,6 +43,12 @@
         /**
          * Returns a specific locale string by ID and key, with optional replacements.
          *
+         * When the key is not found in the requested section, a fallback
+         * lookup is performed against the special "global" section (unless
+         * the requested section IS "global"). This allows shared labels to
+         * be defined once in the `global` section and be available across
+         * all locale sections.
+         *
          * @param string $localeId The first-layer locale ID, eg; "home", "about"
          * @param string $key The second-layer key, eg; "welcome_banner", "test"
          * @param array $replacements Optional array of replacements for patterns like {username}
@@ -51,12 +57,24 @@
         public function getString(string $localeId, string $key, array $replacements = []): ?string
         {
             $localeData = $this->getLocaleData($localeId);
-            if ($localeData === null)
+            if ($localeData !== null)
             {
-                return null;
+                $string = $localeData[$key] ?? null;
+            }
+            else
+            {
+                $string = null;
             }
 
-            $string = $localeData[$key] ?? null;
+            if ($string === null && $localeId !== 'global')
+            {
+                $globalData = $this->getLocaleData('global');
+                if ($globalData !== null)
+                {
+                    $string = $globalData[$key] ?? null;
+                }
+            }
+
             if ($string === null)
             {
                 return null;
@@ -88,13 +106,27 @@
         /**
          * Checks if a specific key exists within a locale ID.
          *
+         * If the key is not found in the requested section, the special
+         * "global" section is checked as a fallback (unless the requested
+         * section IS "global").
+         *
          * @param string $localeId The first-layer locale ID
          * @param string $key The second-layer key
          * @return bool True if the key exists within the locale ID, false otherwise
          */
         public function hasKey(string $localeId, string $key): bool
         {
-            return isset($this->data[$localeId][$key]);
+            if (isset($this->data[$localeId][$key]))
+            {
+                return true;
+            }
+
+            if ($localeId !== 'global' && isset($this->data['global'][$key]))
+            {
+                return true;
+            }
+
+            return false;
         }
 
         /**

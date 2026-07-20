@@ -123,4 +123,107 @@
             $result = $locale->getString('home', 'greeting', ['username' => 42]);
             $this->assertEquals('Hello, 42!', $result);
         }
+
+        public function testGetStringFallsBackToGlobal(): void
+        {
+            $locale = new Locale('en', [
+                'home' => [
+                    'welcome' => 'Welcome!',
+                ],
+                'global' => [
+                    'page_title' => 'My Site',
+                    'footer_text' => 'Copyright {year}',
+                ],
+            ]);
+
+            $this->assertEquals('My Site', $locale->getString('home', 'page_title'));
+        }
+
+        public function testGetStringSectionTakesPriorityOverGlobal(): void
+        {
+            $locale = new Locale('en', [
+                'home' => [
+                    'welcome' => 'Welcome!',
+                    'page_title' => 'Home Page',
+                ],
+                'global' => [
+                    'page_title' => 'My Site',
+                ],
+            ]);
+
+            $this->assertEquals('Home Page', $locale->getString('home', 'page_title'));
+        }
+
+        public function testGetStringGlobalWithReplacements(): void
+        {
+            $locale = new Locale('en', [
+                'home' => [
+                    'welcome' => 'Welcome!',
+                ],
+                'global' => [
+                    'footer_text' => 'Copyright {year}',
+                ],
+            ]);
+
+            $result = $locale->getString('home', 'footer_text', ['year' => '2024']);
+            $this->assertEquals('Copyright 2024', $result);
+        }
+
+        public function testGetStringGlobalItselfDoesNotLoop(): void
+        {
+            $locale = new Locale('en', [
+                'global' => [
+                    'page_title' => 'My Site',
+                ],
+            ]);
+
+            $this->assertEquals('My Site', $locale->getString('global', 'page_title'));
+            $this->assertNull($locale->getString('global', 'nonexistent'));
+        }
+
+        public function testGetStringFallbackReturnsNullWhenNoGlobal(): void
+        {
+            $locale = $this->createLocale();
+            $this->assertNull($locale->getString('home', 'nonexistent_key'));
+        }
+
+        public function testHasKeyFallsBackToGlobal(): void
+        {
+            $locale = new Locale('en', [
+                'home' => [
+                    'welcome' => 'Welcome!',
+                ],
+                'global' => [
+                    'page_title' => 'My Site',
+                ],
+            ]);
+
+            $this->assertTrue($locale->hasKey('home', 'page_title'));
+        }
+
+        public function testHasKeySectionTakesPriorityOverGlobal(): void
+        {
+            $locale = new Locale('en', [
+                'home' => [
+                    'page_title' => 'Home Page',
+                ],
+                'global' => [
+                    'page_title' => 'My Site',
+                ],
+            ]);
+
+            $this->assertTrue($locale->hasKey('home', 'page_title'));
+        }
+
+        public function testHasKeyGlobalNotCheckedWhenRequestedSectionIsGlobal(): void
+        {
+            $locale = new Locale('en', [
+                'global' => [
+                    'page_title' => 'My Site',
+                ],
+            ]);
+
+            $this->assertTrue($locale->hasKey('global', 'page_title'));
+            $this->assertFalse($locale->hasKey('global', 'nonexistent'));
+        }
     }
