@@ -42,7 +42,7 @@ ENV LOGLIB_CONSOLE_ENABLED=false \
     MEMCACHED_SESSION_TTL=3600
 
 RUN apt update && apt install -y --no-install-recommends \
-        nginx supervisor memcached ca-certificates curl nodejs npm \
+        nginx supervisor memcached ca-certificates curl \
     && rm -f /etc/nginx/sites-enabled/default \
     && mkdir -p /var/www/html /var/log/nginx /var/log/supervisor \
     && rm -rf /var/lib/apt/lists/*
