@@ -55,15 +55,30 @@
             // Request ID
             $this->id = uniqid();
             $this->method = RequestMethod::from($_SERVER['REQUEST_METHOD'] ?? 'GET');
-            $this->isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-                || ($_SERVER['SERVER_PORT'] ?? 80) == 443
-                || (strtolower($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
-            $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
-            $port = (int)($_SERVER['SERVER_PORT'] ?? 80);
-            if (!str_contains($host, ':') && $port !== ($this->isSecure ? 443 : 80))
+            $trustProxy = $this->isTrustedProxy($_SERVER['REMOTE_ADDR'] ?? '');
+            $fwdProto = $trustProxy ? strtolower(trim(explode(',', $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')[0])) : '';
+            $this->isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $fwdProto === 'https';
+
+            // Determine the PUBLIC-facing host. SERVER_PORT is the internal listener
+            if ($trustProxy && !empty($_SERVER['HTTP_X_FORWARDED_HOST']))
             {
-                $host .= ':' . $port;
+                $host = trim(explode(',', $_SERVER['HTTP_X_FORWARDED_HOST'])[0]);
             }
+            elseif (!empty($_SERVER['HTTP_HOST']))
+            {
+                $host = $_SERVER['HTTP_HOST'];
+            }
+            else
+            {
+                $host = $_SERVER['SERVER_NAME'] ?? 'localhost';
+                $serverPort = (int)($_SERVER['SERVER_PORT'] ?? 80);
+                // Omit only the well-known HTTP ports; this is independent of TLS.
+                if ($serverPort !== 80 && $serverPort !== 443)
+                {
+                    $host .= ':' . $serverPort;
+                }
+            }
+
             $this->host = $host;
             $this->httpVersion = str_replace('HTTP/', '', ($_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.1'));
             $this->path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
@@ -522,6 +537,28 @@
             }
 
             return null;
+        }
+
+        /**
+         * Determines whether the immediate peer address belongs to a trusted proxy.
+         *
+         * @param string $remoteAddr The REMOTE_ADDR of the connecting peer
+         * @return bool True if the peer is a trusted proxy, false otherwise
+         */
+        private function isTrustedProxy(string $remoteAddr): bool
+        {
+            if ($remoteAddr === '')
+            {
+                return false;
+            }
+
+            // Loopback (127.0.0.0/8, ::1) and link-local always trusted.
+            if (!filter_var($remoteAddr, FILTER_VALIDATE_IP, FILTER_FLAG_NO_RES_RANGE))
+            {
+                return true;
+            }
+
+            return !filter_var($remoteAddr, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE);
         }
 
         /**
