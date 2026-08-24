@@ -82,11 +82,12 @@
         }
 
         /**
-         * Generates and prints a fully-qualified URL for a named route.
+         * Generates and prints a root-relative URL for a named route.
          *
-         * Resolves the route by its ID, builds the URL from the automatically detected base URL
-         * (scheme + host from the current request) and base_path, substitutes any {variable} placeholders in the route
-         * path with values from $pathVariables, and appends optional GET query parameters.
+         * Resolves the route by its ID, builds a root-relative path from base_path and the route
+         * path (no scheme/host, so the browser resolves the origin), substitutes any {variable}
+         * placeholders in the route path with values from $pathVariables, and appends optional GET
+         * query parameters.
          *
          * @param string $id The route ID as defined in the web configuration.
          * @param array $pathVariables Associative array of path variable substitutions (e.g. ['id' => '42']).
@@ -99,11 +100,12 @@
         }
 
         /**
-         * Generates a fully-qualified URL for a named route.
+         * Generates a root-relative URL for a named route.
          *
-         * Resolves the route by its ID, builds the URL from the automatically detected base URL
-         * (scheme + host from the current request) and base_path, substitutes any {variable} placeholders in the route
-         * path with values from $pathVariables, and appends optional GET query parameters.
+         * Resolves the route by its ID, builds a root-relative path from base_path and the route
+         * path (no scheme/host, so the browser resolves the origin), substitutes any {variable}
+         * placeholders in the route path with values from $pathVariables, and appends optional GET
+         * query parameters.
          *
          * @param string $id The route ID as defined in the web configuration.
          * @param array $pathVariables Associative array of path variable substitutions (e.g. ['id' => '42']).
@@ -127,9 +129,9 @@
                 throw new RuntimeException(sprintf('Route with ID "%s" is not defined in the web configuration', $id));
             }
 
-            // Auto-detect the base URL from the current request's scheme, host and port
-            $request  = WebSession::getRequest();
-            $baseUrl  = ($request->isSecure() ? 'https' : 'http') . '://' . rtrim($request->getHost(), '/');
+            // Build a ROOT-RELATIVE path (base_path + route path). Scheme/host are intentionally
+            // omitted so the browser resolves them against the current origin; this avoids leaking
+            // an internal host/port and works transparently behind proxies and tunnels.
             $basePath = rtrim($router->getBasePath(), '/');
             $path     = $route->getPath();
 
@@ -139,7 +141,11 @@
                 $path = str_replace('{' . $key . '}', rawurlencode((string) $value), $path);
             }
 
-            $url = $baseUrl . $basePath . $path;
+            $url = $basePath . $path;
+            if (!str_starts_with($url, '/'))
+            {
+                $url = '/' . $url;
+            }
 
             if (!empty($queryParams))
             {
