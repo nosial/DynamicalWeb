@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.20] - Ongoing
 
-This is an ongoing update
+This update introduces a minor bug fix
+
+### Fixed
+ - Updated routing Request handling logic to not expose bad URL schemes/paths
 
 
 
