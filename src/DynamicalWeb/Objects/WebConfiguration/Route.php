@@ -11,11 +11,13 @@
         private string $module;
         private ?string $localeId;
         private ?array $allowedMethods = null;
+        private bool $csrfExempt = false;
 
         /**
          * Route Constructor
          *
-         * @param array $data The route data containing 'path', 'module', optional 'locale_id', and optional 'allowed_methods'
+         * @param array $data The route data containing 'path', 'module', optional 'locale_id', optional 'allowed_methods'
+         *                    and optional 'csrf_exempt'
          */
         public function __construct(array $data)
         {
@@ -28,6 +30,19 @@
             {
                 $this->allowedMethods = $data['allowed_methods'];
             }
+
+            $this->csrfExempt = (bool)($data['csrf_exempt'] ?? false);
+        }
+
+        /**
+         * Returns true if this route accepts state-changing requests without a CSRF token
+         * when the application's `csrf_protection` is enabled
+         *
+         * @return bool True if the route is exempt from CSRF protection
+         */
+        public function isCsrfExempt(): bool
+        {
+            return $this->csrfExempt;
         }
 
         /**
@@ -100,6 +115,11 @@
             if($this->allowedMethods !== null)
             {
                 $output['allowed_methods'] = $this->allowedMethods;
+            }
+
+            if($this->csrfExempt)
+            {
+                $output['csrf_exempt'] = true;
             }
 
             return $output;
