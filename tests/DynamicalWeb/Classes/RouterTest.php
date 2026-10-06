@@ -20,20 +20,12 @@
             $reflection = new ReflectionClass(Router::class);
 
             $this->convertRouteToRegex = $reflection->getMethod('convertRouteToRegex');
-            $this->convertRouteToRegex->setAccessible(true);
-
             $this->normalizePath = $reflection->getMethod('normalizePath');
-            $this->normalizePath->setAccessible(true);
-
             $this->isMethodAllowed = $reflection->getMethod('isMethodAllowed');
-            $this->isMethodAllowed->setAccessible(true);
-
             $this->matchRouteAndExtractParameters = $reflection->getMethod('matchRouteAndExtractParameters');
-            $this->matchRouteAndExtractParameters->setAccessible(true);
 
             // Clear the static regex cache between tests
             $regexCache = $reflection->getProperty('regexCache');
-            $regexCache->setAccessible(true);
             $regexCache->setValue(null, []);
         }
 
