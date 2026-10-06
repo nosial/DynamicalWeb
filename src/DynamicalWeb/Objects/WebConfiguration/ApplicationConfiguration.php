@@ -23,6 +23,13 @@
         private int $apcuContentTtl;
         private int $apcuMetaTtl;
         private int $apcuConfigTtl;
+        /** @var RequestHook[] */
+        private array $preRequestHooks;
+        /** @var RequestHook[] */
+        private array $postRequestHooks;
+        private bool $csrfProtection;
+        /** @var array<string, string> */
+        private array $headers;
 
         /**
          * ApplicationConfiguration Constructor
@@ -31,7 +38,8 @@
          *        optional 'default_locale', 'report_errors', optional 'xss_level', optional 'pre_request',
          *        optional 'post_request', optional 'debug_panel', optional 'disable_apcu', optional 'disable_default_headers',
          *        optional 'static_cache_max_age', optional 'apcu_content_max_size', optional 'apcu_content_ttl',
-         *        optional 'apcu_meta_ttl', and optional 'apcu_config_ttl'
+         *        optional 'apcu_meta_ttl', optional 'apcu_config_ttl', optional 'csrf_protection' and optional
+         *        'headers'. Each 'pre_request'/'post_request' entry is a module path or a {@see RequestHook} mapping.
          */
         public function __construct(array $data)
         {
@@ -51,6 +59,30 @@
             $this->apcuContentTtl = $data['apcu_content_ttl'] ?? 3600;
             $this->apcuMetaTtl = $data['apcu_meta_ttl'] ?? 10;
             $this->apcuConfigTtl = $data['apcu_config_ttl'] ?? 60;
+            $this->preRequestHooks = self::parseHooks($this->preRequest);
+            $this->postRequestHooks = self::parseHooks($this->postRequest);
+            $this->csrfProtection = (bool)($data['csrf_protection'] ?? false);
+            $this->headers = [];
+            foreach (($data['headers'] ?? []) as $name => $value)
+            {
+                $this->headers[(string)$name] = (string)$value;
+            }
+        }
+
+        /**
+         * Builds the request hooks of a pre_request/post_request list.
+         *
+         * @param mixed $entries The configured entries
+         * @return RequestHook[] The hooks
+         */
+        private static function parseHooks(mixed $entries): array
+        {
+            if ($entries === null)
+            {
+                return [];
+            }
+
+            return array_map(static fn($entry) => new RequestHook($entry), is_array($entries) ? array_values($entries) : [$entries]);
         }
 
         /**
@@ -120,7 +152,22 @@
          */
         public function getPreRequest(): ?array
         {
-            return $this->preRequest;
+            if ($this->preRequest === null)
+            {
+                return null;
+            }
+
+            return array_map(static fn(RequestHook $hook) => $hook->getModule(), $this->preRequestHooks);
+        }
+
+        /**
+         * Returns the pre-request modules with the routes each one runs for
+         *
+         * @return RequestHook[] The pre-request hooks, in configuration order
+         */
+        public function getPreRequestHooks(): array
+        {
+            return $this->preRequestHooks;
         }
 
         /**
@@ -130,7 +177,44 @@
          */
         public function getPostRequest(): ?array
         {
-            return $this->postRequest;
+            if ($this->postRequest === null)
+            {
+                return null;
+            }
+
+            return array_map(static fn(RequestHook $hook) => $hook->getModule(), $this->postRequestHooks);
+        }
+
+        /**
+         * Returns the post-request modules with the routes each one runs for
+         *
+         * @return RequestHook[] The post-request hooks, in configuration order
+         */
+        public function getPostRequestHooks(): array
+        {
+            return $this->postRequestHooks;
+        }
+
+        /**
+         * Returns true when state-changing requests (POST, PUT, DELETE) must carry the session's CSRF token.
+         * Routes can opt out with `csrf_exempt: true`.
+         *
+         * @return bool True if CSRF protection is enabled, false otherwise (default)
+         */
+        public function isCsrfProtectionEnabled(): bool
+        {
+            return $this->csrfProtection;
+        }
+
+        /**
+         * Returns the response headers configured for every response, such as security headers.
+         * Modules and pre-request scripts can still override them.
+         *
+         * @return array<string, string> Header values keyed by header name
+         */
+        public function getHeaders(): array
+        {
+            return $this->headers;
         }
 
         /**
@@ -236,6 +320,8 @@
                 'apcu_content_ttl' => $this->apcuContentTtl,
                 'apcu_meta_ttl' => $this->apcuMetaTtl,
                 'apcu_config_ttl' => $this->apcuConfigTtl,
+                'csrf_protection' => $this->csrfProtection,
+                'headers' => $this->headers,
             ];
         }
 
