@@ -9,10 +9,13 @@
     use DynamicalWeb\Classes\PathResolver;
     use DynamicalWeb\Enums\MimeType;
     use DynamicalWeb\Enums\PathConstants;
+    use DynamicalWeb\Enums\RequestMethod;
     use DynamicalWeb\Enums\ResponseCode;
     use DynamicalWeb\Exceptions\DynamicalWebException;
     use DynamicalWeb\Exceptions\ExecutionException;
     use DynamicalWeb\Objects\WebConfiguration;
+    use DynamicalWeb\Objects\WebConfiguration\RequestHook;
+    use DynamicalWeb\Objects\WebConfiguration\Route;
     use DynamicalWeb\Objects\WebConfiguration\Section;
     use ncc\Runtime;
     use Symfony\Component\Yaml\Yaml;
@@ -269,20 +272,20 @@
 
                 $currentRoute = WebSession::getCurrentRoute();
 
+                // Configured headers are set first so pre-request scripts and modules can still override them
+                foreach($this->webConfiguration->getApplication()->getHeaders() as $headerName => $headerValue)
+                {
+                    WebSession::getResponse()->setHeader($headerName, $headerValue);
+                }
+
+                if ($currentRoute !== null && !$this->verifyCsrfProtection($currentRoute))
+                {
+                    return;
+                }
+
                 if ($currentRoute !== null)
                 {
-                    $preRequests = $this->webConfiguration->getApplication()->getPreRequest();
-                    if($preRequests !== null && count($preRequests) > 0)
-                    {
-                        foreach($preRequests as $preRequestModule)
-                        {
-                            $preRequestModulePath = $this->buildModulePath($preRequestModule);
-                            if (file_exists($preRequestModulePath))
-                            {
-                                ExecutionHandler::executePhp($preRequestModulePath);
-                            }
-                        }
-                    }
+                    $this->executeRequestHooks($this->webConfiguration->getApplication()->getPreRequestHooks(), $currentRoute, false);
                 }
 
                 if(!$this->webConfiguration->getApplication()->isDefaultHeadersDisabled())
@@ -303,18 +306,7 @@
 
                 if ($currentRoute !== null)
                 {
-                    $postRequests = $this->webConfiguration->getApplication()->getPostRequest();
-                    if($postRequests !== null && count($postRequests) > 0)
-                    {
-                        foreach($postRequests as $postRequestModule)
-                        {
-                            $postRequestModulePath = $this->buildModulePath($postRequestModule);
-                            if (file_exists($postRequestModulePath))
-                            {
-                                ExecutionHandler::executePhp($postRequestModulePath);
-                            }
-                        }
-                    }
+                    $this->executeRequestHooks($this->webConfiguration->getApplication()->getPostRequestHooks(), $currentRoute, false);
                 }
 
             }
@@ -362,18 +354,7 @@
 
             if ($currentRoute !== null)
             {
-                $preRequests = $this->webConfiguration->getApplication()->getPreRequest();
-                if($preRequests !== null && count($preRequests) > 0)
-                {
-                    foreach($preRequests as $preRequestModule)
-                    {
-                        $preRequestModulePath = $this->buildModulePath($preRequestModule);
-                        if (file_exists($preRequestModulePath))
-                        {
-                            ExecutionHandler::executePhp($preRequestModulePath);
-                        }
-                    }
-                }
+                $this->executeRequestHooks($this->webConfiguration->getApplication()->getPreRequestHooks(), $currentRoute, true);
             }
 
             $modulePath = WebSession::getModule();
@@ -412,19 +393,114 @@
 
             if ($currentRoute !== null)
             {
-                $postRequests = $this->webConfiguration->getApplication()->getPostRequest();
-                if($postRequests !== null && count($postRequests) > 0)
+                $this->executeRequestHooks($this->webConfiguration->getApplication()->getPostRequestHooks(), $currentRoute, true);
+            }
+        }
+
+        /**
+         * Executes the pre-request or post-request modules that apply to the current route.
+         *
+         * @param RequestHook[] $hooks The configured hooks
+         * @param Route $route The matched route
+         * @param bool $isWebSocket Whether the current request is a WebSocket request
+         * @throws ExecutionException Thrown if a module fails
+         */
+        private function executeRequestHooks(array $hooks, Route $route, bool $isWebSocket): void
+        {
+            foreach($hooks as $hook)
+            {
+                if (!$hook->appliesTo($route, $isWebSocket))
                 {
-                    foreach($postRequests as $postRequestModule)
-                    {
-                        $postRequestModulePath = $this->buildModulePath($postRequestModule);
-                        if (file_exists($postRequestModulePath))
-                        {
-                            ExecutionHandler::executePhp($postRequestModulePath);
-                        }
-                    }
+                    continue;
+                }
+
+                $modulePath = $this->buildModulePath($hook->getModule());
+                if (file_exists($modulePath))
+                {
+                    ExecutionHandler::executePhp($modulePath);
                 }
             }
+        }
+
+        /**
+         * Enforces the application's CSRF protection for state-changing requests. When the token is missing or
+         * invalid, a 403 response is prepared (JSON for script requests) and false is returned.
+         *
+         * @param Route $route The matched route
+         * @return bool True if the request may proceed
+         */
+        private function verifyCsrfProtection(Route $route): bool
+        {
+            $request = WebSession::getRequest();
+            if (!$this->webConfiguration->getApplication()->isCsrfProtectionEnabled() || $route->isCsrfExempt() ||
+                !in_array($request->getMethod(), [RequestMethod::POST, RequestMethod::PUT, RequestMethod::DELETE], true))
+            {
+                return true;
+            }
+
+            if (WebSession::verifyCsrfToken())
+            {
+                return true;
+            }
+
+            Logger::getLogger()->warning(sprintf('Rejected %s %s: missing or invalid CSRF token', $request->getMethod()->value, $request->getPath()));
+            $response = WebSession::getResponse();
+            if ($request->getHeader(WebSession::CSRF_HEADER_NAME) !== null || str_contains(strtolower($request->getHeader('Accept') ?? ''), 'application/json'))
+            {
+                $response->setStatusCode(ResponseCode::FORBIDDEN);
+                $response->setJson(['error' => 'csrf_failed']);
+            }
+            elseif (!$this->renderResponseHandler(ResponseCode::FORBIDDEN))
+            {
+                $response->setStatusCode(ResponseCode::FORBIDDEN);
+                $response->setContentType(MimeType::TEXT);
+                $response->setBody('403 Forbidden: missing or invalid CSRF token');
+            }
+
+            return false;
+        }
+
+        /**
+         * Renders the router's response handler for the given status code into the current response.
+         * A 404 always renders, falling back to the built-in page.
+         *
+         * @param ResponseCode $code The status code
+         * @return bool True if a page was rendered, false if no handler is configured or it failed
+         */
+        public function renderResponseHandler(ResponseCode $code): bool
+        {
+            if ($code === ResponseCode::NOT_FOUND)
+            {
+                $this->handleNotFoundResponse();
+                return true;
+            }
+
+            $handler = $this->webConfiguration->getRouter()->getResponseHandler($code);
+            if ($handler === null)
+            {
+                return false;
+            }
+
+            $handlerPath = $this->buildModulePath($handler);
+            if (!file_exists($handlerPath))
+            {
+                return false;
+            }
+
+            try
+            {
+                $output = ExecutionHandler::executePhtml($handlerPath);
+            }
+            catch (ExecutionException $e)
+            {
+                Logger::getLogger()->error(sprintf('Response handler for %d failed', $code->value), $e);
+                return false;
+            }
+
+            WebSession::getResponse()->setStatusCode($code);
+            WebSession::getResponse()->setContentType(MimeType::HTML);
+            WebSession::getResponse()->setBody($output);
+            return true;
         }
 
         /**
