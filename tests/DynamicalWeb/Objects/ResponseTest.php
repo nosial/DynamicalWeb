@@ -437,4 +437,21 @@
             $this->assertEquals('{"ok":true}', $response->getBody());
         }
 
+        public function testSetCookieDefaultsToLaxSameSite(): void
+        {
+            $response = new Response();
+            $response->setCookie('a', '1');
+            $this->assertSame('Lax', $response->getCookie('a')->getSameSite());
+        }
+
+        public function testSetCookiePassesSameSiteThrough(): void
+        {
+            $response = new Response();
+            $response->setCookie('a', '1', 0, '/', '', true, true, 'Strict');
+
+            $cookie = $response->getCookie('a');
+            $this->assertSame('Strict', $cookie->getSameSite());
+            $this->assertTrue($cookie->isSecure());
+            $this->assertTrue($cookie->isHttpOnly());
+        }
     }

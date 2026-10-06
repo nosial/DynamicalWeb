@@ -2,6 +2,7 @@
 
     namespace DynamicalWeb\Classes;
 
+    use DynamicalWeb\Tests\Fixtures\MemcachedServer;
     use Memcached;
     use PHPUnit\Framework\TestCase;
     use ReflectionClass;
@@ -10,8 +11,6 @@
     {
         private const array ENV_KEYS = ['MEMCACHED_ENABLED', 'MEMCACHED_HOST', 'MEMCACHED_PORT', 'MEMCACHED_KEY_PREFIX'];
 
-        /** @var resource|null */
-        private static $process = null;
         private static ?int $port = null;
         private static array $originalEnv = [];
 
@@ -22,61 +21,12 @@
                 self::$originalEnv[$key] = getenv($key);
             }
 
-            if (!class_exists(Memcached::class))
-            {
-                return;
-            }
-
-            $binary = trim((string)shell_exec('command -v memcached 2>/dev/null'));
-            if ($binary === '')
-            {
-                return;
-            }
-
-            // Grab a free port, then start a throwaway memcached instance on it
-            $socket = stream_socket_server('tcp://127.0.0.1:0');
-            $port = (int)substr(strrchr(stream_socket_get_name($socket, false), ':'), 1);
-            fclose($socket);
-
-            $process = proc_open(
-                [$binary, '-l', '127.0.0.1', '-p', (string)$port, '-U', '0', '-m', '16'],
-                [['file', '/dev/null', 'r'], ['file', '/dev/null', 'w'], ['file', '/dev/null', 'w']],
-                $pipes
-            );
-
-            if (!is_resource($process))
-            {
-                return;
-            }
-
-            for ($i = 0; $i < 50; $i++)
-            {
-                $connection = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.1);
-                if ($connection !== false)
-                {
-                    fclose($connection);
-                    self::$process = $process;
-                    self::$port = $port;
-                    return;
-                }
-
-                usleep(100000);
-            }
-
-            proc_terminate($process);
-            proc_close($process);
+            self::$port = MemcachedServer::start();
         }
 
         public static function tearDownAfterClass(): void
         {
             self::resetMemcache();
-
-            if (self::$process !== null)
-            {
-                proc_terminate(self::$process);
-                proc_close(self::$process);
-                self::$process = null;
-            }
 
             foreach (self::$originalEnv as $key => $value)
             {
