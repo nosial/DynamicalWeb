@@ -2,6 +2,7 @@
 
     namespace DynamicalWeb\Classes;
 
+    use DynamicalWeb\Enums\RequestMethod;
     use DynamicalWeb\Objects\CookieSession;
     use DynamicalWeb\WebSession;
     use Exception;
@@ -18,6 +19,8 @@
         private string $keyPrefix;
         private string $cookieName;
         private string $secret;
+        private bool $slidingExpiration = false;
+        private bool $bindIp = true;
 
         /**
          * CookieSessionManager Constructor
@@ -50,6 +53,8 @@
             $this->keyPrefix = 'dw_sess_';
             $this->cookieName = 'web_session';
             $this->secret = getenv('MEMCACHED_SESSION_SECRET') ?: 'dynamicalweb_default_session_secret';
+            $this->slidingExpiration = self::isTruthy(getenv('MEMCACHED_SESSION_SLIDING'), false);
+            $this->bindIp = self::isTruthy(getenv('MEMCACHED_SESSION_BIND_IP'), true);
 
             try
             {
@@ -98,6 +103,27 @@
         public function getSessionTtl(): int
         {
             return $this->sessionTtl;
+        }
+
+        /**
+         * Check if the session cookie's expiry is renewed every time the session is read
+         * (MEMCACHED_SESSION_SLIDING), turning the session TTL into an idle timeout.
+         *
+         * @return bool True if sliding expiration is enabled, false otherwise.
+         */
+        public function isSlidingExpiration(): bool
+        {
+            return $this->slidingExpiration;
+        }
+
+        /**
+         * Check if session fingerprints include the client's IP address (MEMCACHED_SESSION_BIND_IP).
+         *
+         * @return bool True if sessions are bound to the client IP address, false otherwise.
+         */
+        public function isIpBound(): bool
+        {
+            return $this->bindIp;
         }
 
         /**
@@ -198,10 +224,17 @@
             $sessionId = $this->generateSessionId();
             $fingerprint = $this->computeFingerprint();
             $expires = time() + $this->sessionTtl;
-            $session = new CookieSession($sessionId, $data, $expires, $fingerprint);
+            $cookieOptions = [
+                'path' => $path,
+                'domain' => $domain,
+                'secure' => $secure,
+                'http_only' => $httpOnly,
+                'same_site' => $sameSite,
+            ];
+            $session = new CookieSession($sessionId, $data, $expires, $fingerprint, $cookieOptions);
             if ($this->storeSession($session))
             {
-                $this->setSessionCookie($sessionId, $expires, $cookieName, $path, $domain, $secure, $httpOnly);
+                $this->setSessionCookie($sessionId, $expires, $cookieName, $path, $domain, $secure, $httpOnly, $sameSite);
                 return $session;
             }
 
@@ -283,14 +316,45 @@
             $session = CookieSession::fromArray($data);
 
             $currentFingerprint = $this->computeFingerprint();
-            if ($session->getFingerprint() !== '' && $session->getFingerprint() !== $currentFingerprint)
+            if ($session->getFingerprint() !== '' && !hash_equals($session->getFingerprint(), $currentFingerprint))
             {
-                $this->memcached->delete($key);
-                $this->removeSessionCookie($cookieName, $path, $domain);
-                return null;
+                if (!$this->bindIp && hash_equals($session->getFingerprint(), $this->computeFingerprint(true)))
+                {
+                    // Created while sessions were IP-bound; move it to the IP-independent fingerprint
+                    $session->setFingerprint($currentFingerprint);
+                    $this->storeSession($session);
+                }
+                elseif ($this->isWebSocketRequest())
+                {
+                    // WebSocket requests arrive through the local bridge, so a mismatch here does not
+                    // mean the session was hijacked; leave the browser's session intact
+                    return null;
+                }
+                else
+                {
+                    $this->memcached->delete($key);
+                    $this->removeSessionCookie($cookieName, $path, $domain);
+                    return null;
+                }
             }
 
             $this->memcached->touch($key, $this->sessionTtl);
+
+            if ($this->slidingExpiration && !$this->isWebSocketRequest())
+            {
+                $options = $session->getCookieOptions();
+                $this->setSessionCookie(
+                    $sessionId,
+                    time() + $this->sessionTtl,
+                    $cookieName,
+                    $options['path'] ?? $path,
+                    $options['domain'] ?? $domain,
+                    $options['secure'] ?? null,
+                    $options['http_only'] ?? true,
+                    $options['same_site'] ?? 'Lax'
+                );
+            }
+
             return $session;
         }
 
@@ -330,11 +394,13 @@
         }
 
         /**
-         * Compute a fingerprint for the current request based on the client's IP address and User-Agent string.
+         * Compute a fingerprint for the current request based on the client's IP address (unless
+         * MEMCACHED_SESSION_BIND_IP is disabled) and User-Agent string.
          *
+         * @param bool|null $includeIp Whether to include the client IP address. Defaults to the configured behaviour.
          * @return string The computed fingerprint hash.
          */
-        private function computeFingerprint(): string
+        private function computeFingerprint(?bool $includeIp = null): string
         {
             $request = WebSession::getRequest();
             if ($request === null)
@@ -342,10 +408,41 @@
                 return '';
             }
 
-            $ip = $request->getClientIp() ?? '';
             $ua = $request->getUserAgentString() ?? '';
+            if (!($includeIp ?? $this->bindIp))
+            {
+                return hash_hmac('sha256', 'ua|' . $ua, $this->secret);
+            }
 
+            $ip = $request->getClientIp() ?? '';
             return hash_hmac('sha256', $ip . '|' . $ua, $this->secret);
+        }
+
+        /**
+         * Check if the current request is a WebSocket request.
+         *
+         * @return bool True if the current request is a WebSocket request, false otherwise.
+         */
+        private function isWebSocketRequest(): bool
+        {
+            return WebSession::getRequest()?->getMethod() === RequestMethod::WEBSOCKET;
+        }
+
+        /**
+         * Interprets an environment variable as a boolean flag.
+         *
+         * @param string|false $value The environment variable value, or false when unset.
+         * @param bool $default The value to use when the variable is unset or empty.
+         * @return bool The interpreted flag.
+         */
+        private static function isTruthy(string|false $value, bool $default): bool
+        {
+            if ($value === false || trim($value) === '')
+            {
+                return $default;
+            }
+
+            return in_array(strtolower(trim($value)), ['1', 'true', 'yes', 'on'], true);
         }
 
         /**
@@ -358,8 +455,9 @@
          * @param string $domain The cookie domain. Defaults to '' (current domain).
          * @param bool|null $secure Whether the cookie should only be sent over HTTPS. Null = auto-detect from request.
          * @param bool $httpOnly Whether the cookie should be accessible only via HTTP. Defaults to true.
+         * @param string $sameSite The SameSite attribute (None, Lax, or Strict). Defaults to 'Lax'.
          */
-        private function setSessionCookie(string $sessionId, int $expires, ?string $cookieName = null, string $path = '/', string $domain = '', ?bool $secure = null, bool $httpOnly = true): void
+        private function setSessionCookie(string $sessionId, int $expires, ?string $cookieName = null, string $path = '/', string $domain = '', ?bool $secure = null, bool $httpOnly = true, string $sameSite = 'Lax'): void
         {
             $response = WebSession::getResponse();
             if ($response === null)
@@ -373,7 +471,7 @@
                 $secure = $request !== null && $request->isSecure();
             }
 
-            $response->setCookie($cookieName ?? $this->cookieName, $sessionId, $expires, $path, $domain, $secure, $httpOnly);
+            $response->setCookie($cookieName ?? $this->cookieName, $sessionId, $expires, $path, $domain, $secure, $httpOnly, $sameSite);
         }
 
         /**
