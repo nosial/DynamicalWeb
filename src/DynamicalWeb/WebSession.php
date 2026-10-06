@@ -5,9 +5,12 @@
     use DynamicalWeb\Classes\Apcu;
     use DynamicalWeb\Classes\CookieSessionManager;
     use DynamicalWeb\Classes\Logger;
+    use DynamicalWeb\Classes\RequestCache;
     use DynamicalWeb\Classes\Router;
+    use DynamicalWeb\Enums\ResponseCode;
     use DynamicalWeb\Exceptions\LocaleException;
     use DynamicalWeb\Exceptions\WebSocketException;
+    use DynamicalWeb\Html\Functions;
     use DynamicalWeb\Objects\CookieSession;
     use DynamicalWeb\Objects\Locale;
     use DynamicalWeb\Objects\Request;
@@ -21,6 +24,11 @@
 
     class WebSession
     {
+        public const string CSRF_FIELD_NAME = 'csrf_token';
+        public const string CSRF_HEADER_NAME = 'X-CSRF-Token';
+        private const string CSRF_SESSION_KEY = '_dw_csrf_token';
+        private const string FLASH_SESSION_KEY = '_dw_flash';
+
         private static ?DynamicalWeb $instance=null;
         private static ?Request $request=null;
         private static ?Response $response=null;
@@ -32,6 +40,10 @@
         private static array $localeFileCache=[];
         private static ?array $variables;
         private static ?CookieSessionManager $cookieSessionManager=null;
+        /** @var array<string, CookieSession> Cookie sessions loaded during this request, keyed by cookie name */
+        private static array $loadedCookieSessions=[];
+        /** @var array<string, CookieSession> Cookie sessions created during this request, keyed by cookie name */
+        private static array $createdCookieSessions=[];
 
         /**
          * Starts the web session instance with the provided DynamicalWeb instance.
@@ -70,6 +82,9 @@
             self::$currentRoute = $routeResult->getRoute();
             self::$exception = null;
             self::$variables = [];
+            self::$loadedCookieSessions = [];
+            self::$createdCookieSessions = [];
+            RequestCache::clear();
             self::loadLocale();
         }
 
@@ -127,6 +142,9 @@
             self::$exception = null;
             self::$variables = null;
             self::$cookieSessionManager = null;
+            self::$loadedCookieSessions = [];
+            self::$createdCookieSessions = [];
+            RequestCache::clear();
 
             if ($exitCode !== null)
             {
@@ -224,16 +242,31 @@
             return self::$locale;
         }
 
+        /**
+         * Returns the WebSocket object associated with the current web session.
+         *
+         * @return WebSocket|null
+         */
         public static function getWebSocket(): ?WebSocket
         {
             return self::$websocket;
         }
 
+        /**
+         * Sets the WebSocket object associated with the current web session.
+         *
+         * @param WebSocket|null $websocket The WebSocket object to set.
+         */
         public static function setWebSocket(?WebSocket $websocket): void
         {
             self::$websocket = $websocket;
         }
 
+        /**
+         * Checks if a WebSocket object is associated with the current web session.
+         *
+         * @return bool True if a WebSocket object is set, false otherwise.
+         */
         public static function hasWebSocket(): bool
         {
             return self::$websocket !== null;
@@ -342,7 +375,21 @@
                 return null;
             }
 
-            return $manager->getSession($cookieName);
+            // Every caller in a request shares one instance, so changes saved by one are never
+            // overwritten by another caller saving an older copy of the same session
+            $name = $cookieName ?? $manager->getCookieName();
+            if (isset(self::$loadedCookieSessions[$name]))
+            {
+                return self::$loadedCookieSessions[$name];
+            }
+
+            $session = $manager->getSession($cookieName);
+            if ($session !== null)
+            {
+                self::$loadedCookieSessions[$name] = $session;
+            }
+
+            return $session;
         }
 
         /**
@@ -365,7 +412,13 @@
                 return null;
             }
 
-            return $manager->createSession($data, $cookieName, $path, $domain, $secure, $httpOnly, $sameSite);
+            $session = $manager->createSession($data, $cookieName, $path, $domain, $secure, $httpOnly, $sameSite);
+            if ($session !== null)
+            {
+                self::$createdCookieSessions[$cookieName ?? $manager->getCookieName()] = $session;
+            }
+
+            return $session;
         }
 
         /**
@@ -401,7 +454,213 @@
                 return false;
             }
 
+            $name = $cookieName ?? $manager->getCookieName();
+            unset(self::$loadedCookieSessions[$name], self::$createdCookieSessions[$name]);
             return $manager->destroySession($cookieName, $path, $domain);
+        }
+
+        /**
+         * Returns the cookie session for the current request: the one loaded from the request cookie, or the one
+         * created earlier in this request. When neither exists and $create is true, a new session is created.
+         *
+         * @param string|null $cookieName Optional cookie name. Defaults to the configured cookie name.
+         * @param bool $create Whether to create a session when none exists.
+         * @return CookieSession|null The session, or null if cookie sessions are disabled or none exists.
+         */
+        private static function resolveCookieSession(?string $cookieName, bool $create): ?CookieSession
+        {
+            $manager = self::getCookieSessionManager();
+            if ($manager === null)
+            {
+                return null;
+            }
+
+            $session = self::getCookieSession($cookieName) ?? self::$createdCookieSessions[$cookieName ?? $manager->getCookieName()] ?? null;
+            if ($session === null && $create)
+            {
+                $session = self::createCookieSession([], $cookieName);
+            }
+
+            return $session;
+        }
+
+        /**
+         * Returns the CSRF token of the current cookie session, creating the session and token on first use.
+         *
+         * Forms echo it back in the {@see WebSession::CSRF_FIELD_NAME} field (see {@see Functions::csrfField()})
+         * and scripts in the {@see WebSession::CSRF_HEADER_NAME} header (see {@see Functions::csrfMeta()}).
+         *
+         * @param string|null $cookieName Optional cookie name of the session. Defaults to the configured cookie name.
+         * @return string|null The token, or null if cookie sessions are disabled.
+         */
+        public static function getCsrfToken(?string $cookieName = null): ?string
+        {
+            $session = self::resolveCookieSession($cookieName, true);
+            if ($session === null)
+            {
+                return null;
+            }
+
+            $token = $session->get(self::CSRF_SESSION_KEY);
+            if (!is_string($token) || $token === '')
+            {
+                $token = bin2hex(random_bytes(32));
+                $session->set(self::CSRF_SESSION_KEY, $token);
+                self::saveCookieSession($session);
+            }
+
+            return $token;
+        }
+
+        /**
+         * Checks a submitted CSRF token against the current cookie session's token.
+         *
+         * @param string|null $token The submitted token. When null, it is read from the
+         *                           {@see WebSession::CSRF_FIELD_NAME} parameter or the
+         *                           {@see WebSession::CSRF_HEADER_NAME} header of the current request.
+         * @param string|null $cookieName Optional cookie name of the session. Defaults to the configured cookie name.
+         * @return bool True if the session has a token and the submitted token matches it.
+         */
+        public static function verifyCsrfToken(?string $token = null, ?string $cookieName = null): bool
+        {
+            if ($token === null && self::$request !== null)
+            {
+                $parameter = self::$request->getParameters()[self::CSRF_FIELD_NAME] ?? null;
+                $token = is_string($parameter) ? $parameter : self::$request->getHeader(self::CSRF_HEADER_NAME);
+            }
+
+            $expected = self::resolveCookieSession($cookieName, false)?->get(self::CSRF_SESSION_KEY);
+            return is_string($expected) && $expected !== '' && is_string($token) && hash_equals($expected, $token);
+        }
+
+        /**
+         * Stores a value in the cookie session until it is read with {@see WebSession::getFlash()}, typically to show
+         * a message on the page a redirect leads to. Creates the cookie session if it does not exist.
+         *
+         * @param string $key The flash key.
+         * @param mixed $value The value, which must be serializable.
+         * @param string|null $cookieName Optional cookie name of the session. Defaults to the configured cookie name.
+         * @return bool True if the value was stored, false if cookie sessions are disabled or saving failed.
+         */
+        public static function flash(string $key, mixed $value, ?string $cookieName = null): bool
+        {
+            $session = self::resolveCookieSession($cookieName, true);
+            if ($session === null)
+            {
+                return false;
+            }
+
+            $flash = $session->get(self::FLASH_SESSION_KEY, []);
+            $flash = is_array($flash) ? $flash : [];
+            $flash[$key] = $value;
+            $session->set(self::FLASH_SESSION_KEY, $flash);
+            return self::saveCookieSession($session);
+        }
+
+        /**
+         * Returns a value stored with {@see WebSession::flash()} and removes it, so it is only shown once.
+         *
+         * @param string $key The flash key.
+         * @param mixed $default The value to return when the key is not set.
+         * @param string|null $cookieName Optional cookie name of the session. Defaults to the configured cookie name.
+         * @return mixed The flashed value, or $default.
+         */
+        public static function getFlash(string $key, mixed $default = null, ?string $cookieName = null): mixed
+        {
+            $session = self::resolveCookieSession($cookieName, false);
+            $flash = $session?->get(self::FLASH_SESSION_KEY, []);
+            if (!is_array($flash) || !array_key_exists($key, $flash))
+            {
+                return $default;
+            }
+
+            $value = $flash[$key];
+            unset($flash[$key]);
+            if (count($flash) === 0)
+            {
+                $session->remove(self::FLASH_SESSION_KEY);
+            }
+            else
+            {
+                $session->set(self::FLASH_SESSION_KEY, $flash);
+            }
+
+            self::saveCookieSession($session);
+            return $value;
+        }
+
+        /**
+         * Checks if a value stored with {@see WebSession::flash()} is waiting to be read, without removing it.
+         *
+         * @param string $key The flash key.
+         * @param string|null $cookieName Optional cookie name of the session. Defaults to the configured cookie name.
+         * @return bool True if the flash key is set.
+         */
+        public static function hasFlash(string $key, ?string $cookieName = null): bool
+        {
+            $flash = self::resolveCookieSession($cookieName, false)?->get(self::FLASH_SESSION_KEY, []);
+            return is_array($flash) && array_key_exists($key, $flash);
+        }
+
+        /**
+         * Redirects to the given URL, sends the response and ends the request.
+         *
+         * @param string $url The URL to redirect to.
+         * @param ResponseCode|null $statusCode Optional redirect status code. Defaults to 302 Found.
+         */
+        public static function redirectTo(string $url, ?ResponseCode $statusCode = null): void
+        {
+            self::ensureResponse();
+            self::$response->setRedirect($url, $statusCode);
+            self::endSession(0);
+        }
+
+        /**
+         * Redirects to a named route, sends the response and ends the request.
+         *
+         * @param string $id The route ID as defined in the web configuration.
+         * @param array $pathVariables Associative array of path variable substitutions.
+         * @param array $queryParams Associative array of query string parameters to append.
+         * @param ResponseCode|null $statusCode Optional redirect status code. Defaults to 302 Found.
+         */
+        public static function redirectToRoute(string $id, array $pathVariables = [], array $queryParams = [], ?ResponseCode $statusCode = null): void
+        {
+            self::redirectTo(Functions::getRouteUrl($id, $pathVariables, $queryParams), $statusCode);
+        }
+
+        /**
+         * Sends a JSON response and ends the request.
+         *
+         * @param mixed $data The data to encode as JSON.
+         * @param ResponseCode|int $statusCode The response status code. Defaults to 200 OK.
+         */
+        public static function respondJson(mixed $data, ResponseCode|int $statusCode = ResponseCode::OK): void
+        {
+            self::ensureResponse();
+            self::$response->setStatusCode($statusCode);
+            self::$response->setJson($data);
+            self::endSession(0);
+        }
+
+        /**
+         * Sends an error response and ends the request. Without a message, the router's response handler for the
+         * status code is rendered when one is configured; otherwise a plain text response is sent.
+         *
+         * @param ResponseCode|int $statusCode The response status code.
+         * @param string|null $message Optional plain text body.
+         */
+        public static function abort(ResponseCode|int $statusCode, ?string $message = null): void
+        {
+            self::ensureResponse();
+            $code = $statusCode instanceof ResponseCode ? $statusCode : (ResponseCode::tryFrom($statusCode) ?? ResponseCode::INTERNAL_SERVER_ERROR);
+            if ($message !== null || self::$instance === null || !self::$instance->renderResponseHandler($code))
+            {
+                self::$response->setStatusCode($code);
+                self::$response->setContentType('text/plain');
+                self::$response->setBody($message ?? $code->value . ' ' . $code->getMessage());
+            }
+
+            self::endSession(0);
         }
 
         /**
