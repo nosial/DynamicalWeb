@@ -10,6 +10,7 @@
         private array $data;
         private int $expires;
         private string $fingerprint;
+        private array $cookieOptions;
 
         /**
          * CookieSession Constructor
@@ -18,13 +19,15 @@
          * @param array $data The session data as an associative array
          * @param int $expires The expiration timestamp of the session
          * @param string $fingerprint An optional fingerprint for additional security
+         * @param array $cookieOptions Optional attributes of the session cookie (path, domain, secure, http_only, same_site)
          */
-        public function __construct(string $sessionId, array $data=[], int $expires=0, string $fingerprint='')
+        public function __construct(string $sessionId, array $data=[], int $expires=0, string $fingerprint='', array $cookieOptions=[])
         {
             $this->sessionId = $sessionId;
             $this->data = $data;
             $this->expires = $expires;
             $this->fingerprint = $fingerprint;
+            $this->cookieOptions = $cookieOptions;
         }
 
         /**
@@ -55,6 +58,27 @@
         public function getFingerprint(): string
         {
             return $this->fingerprint;
+        }
+
+        /**
+         * Replace the fingerprint associated with the session
+         *
+         * @param string $fingerprint The new session fingerprint
+         */
+        public function setFingerprint(string $fingerprint): void
+        {
+            $this->fingerprint = $fingerprint;
+        }
+
+        /**
+         * Get the attributes the session cookie was created with (path, domain, secure, http_only, same_site).
+         * Sessions created before these were recorded return an empty array.
+         *
+         * @return array The session cookie attributes
+         */
+        public function getCookieOptions(): array
+        {
+            return $this->cookieOptions;
         }
 
         /**
@@ -121,6 +145,7 @@
                 'data' => $this->data,
                 'expires' => $this->expires,
                 'fingerprint' => $this->fingerprint,
+                'cookie_options' => $this->cookieOptions,
             ];
         }
 
@@ -134,6 +159,7 @@
                 $array['data'] ?? [],
                 $array['expires'] ?? 0,
                 $array['fingerprint'] ?? '',
+                $array['cookie_options'] ?? [],
             );
         }
     }
