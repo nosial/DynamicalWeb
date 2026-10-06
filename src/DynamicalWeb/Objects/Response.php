@@ -292,11 +292,12 @@
          * @param bool $secure Whether the cookie should only be transmitted over secure HTTPS connections. Default is false.
          * @param bool $httpOnly Whether the cookie should be accessible only through the HTTP protocol and not accessible
          *                       via JavaScript. Default is false.
+         * @param string $sameSite The SameSite attribute (None, Lax, or Strict). Default is 'Lax'.
          * @return self Returns the Response object for method chaining.
          */
-        public function setCookie(string $name, string $value, int $expires = 0, string $path = '/', string $domain = '', bool $secure = false, bool $httpOnly = false): self
+        public function setCookie(string $name, string $value, int $expires = 0, string $path = '/', string $domain = '', bool $secure = false, bool $httpOnly = false, string $sameSite = 'Lax'): self
         {
-            $this->cookies[$name] = new Cookie($name, $value, $expires, $path, $domain, $secure, $httpOnly);
+            $this->cookies[$name] = new Cookie($name, $value, $expires, $path, $domain, $secure, $httpOnly, $sameSite);
             return $this;
         }
 
