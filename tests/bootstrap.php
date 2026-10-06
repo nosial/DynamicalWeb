@@ -13,3 +13,9 @@
         }
 
         import($buildOutputPath);
+        require_once __DIR__ . '/Fixtures/WebSessionFixture.php';
+        if (!class_exists(Memcached::class))
+        {
+            require_once __DIR__ . '/Fixtures/MemcachedStub.php';
+        }
+        require_once __DIR__ . '/Fixtures/FakeMemcached.php';
