@@ -62,6 +62,8 @@
 
         /**
          * Returns the prefix applied to every key stored through this wrapper.
+         *
+         * @return string The applied prefix
          */
         public static function getKeyPrefix(): string
         {
@@ -72,9 +74,9 @@
         /**
          * Fetches an entry from Memcached.
          *
-         * @param string $key     Cache key
-         * @param bool   $success Set to true on cache hit, false on miss
-         * @return mixed          Cached value, or false on miss / unavailable
+         * @param string $key Cache key
+         * @param bool $success Set to true on cache hit, false on miss
+         * @return mixed Cached value, or false on miss / unavailable
          */
         public static function fetch(string $key, mixed &$success = false): mixed
         {
@@ -94,9 +96,9 @@
          * Stores a value in Memcached, overwriting any existing value.
          *
          * @param string $key   Cache key
-         * @param mixed  $value Value to store
-         * @param int    $ttl   Time-to-live in seconds (0 = no expiry)
-         * @return bool         True on success, false on failure or if Memcached is unavailable
+         * @param mixed $value Value to store
+         * @param int $ttl Time-to-live in seconds (0 = no expiry)
+         * @return bool True on success, false on failure or if Memcached is unavailable
          */
         public static function store(string $key, mixed $value, int $ttl = 0): bool
         {
@@ -106,10 +108,10 @@
         /**
          * Stores a value in Memcached only if the key does not already exist.
          *
-         * @param string $key   Cache key
-         * @param mixed  $value Value to store
-         * @param int    $ttl   Time-to-live in seconds (0 = no expiry)
-         * @return bool         True if the value was stored, false if the key exists or Memcached is unavailable
+         * @param string $key Cache key
+         * @param mixed $value Value to store
+         * @param int $ttl Time-to-live in seconds (0 = no expiry)
+         * @return bool True if the value was stored, false if the key exists or Memcached is unavailable
          */
         public static function add(string $key, mixed $value, int $ttl = 0): bool
         {
@@ -120,7 +122,7 @@
          * Deletes an entry from Memcached.
          *
          * @param string $key Cache key
-         * @return bool       True if the key existed and was removed
+         * @return bool True if the key existed and was removed
          */
         public static function delete(string $key): bool
         {
@@ -144,7 +146,7 @@
          * Fetches multiple entries from Memcached.
          *
          * @param string[] $keys Cache keys
-         * @return array         Associative array of key => value for every key that was found
+         * @return array Associative array of key => value for every key that was found
          */
         public static function fetchMultiple(array $keys): array
         {
@@ -161,8 +163,8 @@
          * Stores multiple entries in Memcached.
          *
          * @param array $items Associative array of key => value
-         * @param int   $ttl   Time-to-live in seconds (0 = no expiry)
-         * @return bool        True on success, false on failure or if Memcached is unavailable
+         * @param int $ttl Time-to-live in seconds (0 = no expiry)
+         * @return bool True on success, false on failure or if Memcached is unavailable
          */
         public static function storeMultiple(array $items, int $ttl = 0): bool
         {
@@ -172,11 +174,11 @@
         /**
          * Increments a numeric entry, initializing it to `$initial` if it does not exist.
          *
-         * @param string $key     Cache key
-         * @param int    $offset  Amount to increment by
-         * @param int    $initial Initial value if the key does not exist
-         * @param int    $ttl     Time-to-live in seconds used when the key is initialized (0 = no expiry)
-         * @return int|false      The new value, or false on failure / unavailable
+         * @param string $key Cache key
+         * @param int $offset Amount to increment by
+         * @param int $initial Initial value if the key does not exist
+         * @param int $ttl Time-to-live in seconds used when the key is initialized (0 = no expiry)
+         * @return int|false The new value, or false on failure / unavailable
          */
         public static function increment(string $key, int $offset = 1, int $initial = 0, int $ttl = 0): int|false
         {
@@ -205,11 +207,11 @@
          * Decrements a numeric entry, initializing it to `$initial` if it does not exist.
          * Memcached never decrements below zero.
          *
-         * @param string $key     Cache key
-         * @param int    $offset  Amount to decrement by
-         * @param int    $initial Initial value if the key does not exist
-         * @param int    $ttl     Time-to-live in seconds used when the key is initialized (0 = no expiry)
-         * @return int|false      The new value, or false on failure / unavailable
+         * @param string $key Cache key
+         * @param int $offset Amount to decrement by
+         * @param int $initial Initial value if the key does not exist
+         * @param int $ttl Time-to-live in seconds used when the key is initialized (0 = no expiry)
+         * @return int|false The new value, or false on failure / unavailable
          */
         public static function decrement(string $key, int $offset = 1, int $initial = 0, int $ttl = 0): int|false
         {
@@ -237,8 +239,8 @@
          * Updates the time-to-live of an existing entry without changing its value.
          *
          * @param string $key Cache key
-         * @param int    $ttl New time-to-live in seconds (0 = no expiry)
-         * @return bool       True on success, false if the key does not exist or Memcached is unavailable
+         * @param int $ttl New time-to-live in seconds (0 = no expiry)
+         * @return bool True on success, false if the key does not exist or Memcached is unavailable
          */
         public static function touch(string $key, int $ttl): bool
         {
@@ -250,8 +252,8 @@
          *
          * When Memcached is unavailable the callback is always invoked and its result returned uncached.
          *
-         * @param string   $key      Cache key
-         * @param int      $ttl      Time-to-live in seconds (0 = no expiry)
+         * @param string $key Cache key
+         * @param int $ttl Time-to-live in seconds (0 = no expiry)
          * @param callable $callback Producer invoked on a cache miss
          * @return mixed
          */

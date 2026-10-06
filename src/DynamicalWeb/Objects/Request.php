@@ -365,6 +365,85 @@
         }
 
         /**
+         * Returns a parameter (from merged parameters) as an integer.
+         *
+         * @param string $name The parameter name
+         * @param int|null $default Value returned when the parameter is missing or not a whole number
+         * @param int|null $min Optional lower bound; smaller values are raised to it
+         * @param int|null $max Optional upper bound; larger values are lowered to it
+         * @return int|null The integer value, or $default
+         */
+        public function getIntParameter(string $name, ?int $default = null, ?int $min = null, ?int $max = null): ?int
+        {
+            $value = $this->getParameters()[$name] ?? null;
+            if (is_int($value))
+            {
+                $int = $value;
+            }
+            elseif (is_string($value) && preg_match('/^\s*[-+]?\d+\s*$/', $value) === 1 && filter_var(trim($value), FILTER_VALIDATE_INT) !== false)
+            {
+                $int = (int)trim($value);
+            }
+            else
+            {
+                return $default;
+            }
+
+            if ($min !== null && $int < $min)
+            {
+                $int = $min;
+            }
+            if ($max !== null && $int > $max)
+            {
+                $int = $max;
+            }
+
+            return $int;
+        }
+
+        /**
+         * Returns a parameter (from merged parameters) as a boolean. Accepts 1/0, true/false, yes/no and on/off.
+         *
+         * @param string $name The parameter name
+         * @param bool|null $default Value returned when the parameter is missing or not a boolean
+         * @return bool|null The boolean value, or $default
+         */
+        public function getBoolParameter(string $name, ?bool $default = null): ?bool
+        {
+            $value = $this->getParameters()[$name] ?? null;
+            if (is_bool($value))
+            {
+                return $value;
+            }
+            if ((!is_string($value) && !is_int($value)) || trim((string)$value) === '')
+            {
+                return $default;
+            }
+
+            return filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? $default;
+        }
+
+        /**
+         * Returns a parameter (from merged parameters) as a string, ignoring array values.
+         *
+         * @param string $name The parameter name
+         * @param string|null $default Value returned when the parameter is missing or not a scalar
+         * @param bool $trim Whether to trim surrounding whitespace
+         * @return string|null The string value, or $default
+         */
+        public function getStringParameter(string $name, ?string $default = null, bool $trim = false): ?string
+        {
+            $value = $this->getParameters()[$name] ?? null;
+            if (!is_scalar($value))
+            {
+                return $default;
+            }
+
+            $value = (string)$value;
+            return $trim ? trim($value) : $value;
+        }
+
+        /**
          * Returns all raw uploaded files from $_FILES.
          *
          * @return array<string, array> Raw files array
