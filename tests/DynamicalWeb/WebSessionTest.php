@@ -3,15 +3,14 @@
     namespace DynamicalWeb;
 
     use DynamicalWeb\Enums\RequestMethod;
-    use DynamicalWeb\Tests\Fixtures\MemcachedServer;
+    use DynamicalWeb\Tests\Fixtures\FakeMemcached;
     use DynamicalWeb\Tests\Fixtures\WebSessionFixture;
     use PHPUnit\Framework\TestCase;
 
     class WebSessionTest extends TestCase
     {
-        private const array ENV_KEYS = ['MEMCACHED_ENABLED', 'MEMCACHED_HOST', 'MEMCACHED_PORT'];
+        private const array ENV_KEYS = ['MEMCACHED_ENABLED'];
 
-        private static ?int $port = null;
         private static array $originalEnv = [];
 
         public static function setUpBeforeClass(): void
@@ -20,8 +19,6 @@
             {
                 self::$originalEnv[$key] = getenv($key);
             }
-
-            self::$port = MemcachedServer::start();
         }
 
         public static function tearDownAfterClass(): void
@@ -40,15 +37,8 @@
 
         private function enableSessions(array $requestOptions = []): void
         {
-            if (self::$port === null)
-            {
-                $this->markTestSkipped('The memcached extension and server binary are required');
-            }
-
             putenv('MEMCACHED_ENABLED=1');
-            putenv('MEMCACHED_HOST=127.0.0.1');
-            putenv('MEMCACHED_PORT=' . self::$port);
-            MemcachedServer::flush();
+            FakeMemcached::reset();
             WebSessionFixture::install(WebSessionFixture::makeRequest($requestOptions));
         }
 

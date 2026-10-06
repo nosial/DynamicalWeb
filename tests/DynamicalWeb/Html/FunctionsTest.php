@@ -4,7 +4,7 @@
 
     use DynamicalWeb\Objects\Locale;
     use DynamicalWeb\Objects\WebConfiguration\Route;
-    use DynamicalWeb\Tests\Fixtures\MemcachedServer;
+    use DynamicalWeb\Tests\Fixtures\FakeMemcached;
     use DynamicalWeb\Tests\Fixtures\WebSessionFixture;
     use DynamicalWeb\WebSession;
     use PHPUnit\Framework\TestCase;
@@ -16,7 +16,7 @@
 
         public static function setUpBeforeClass(): void
         {
-            foreach (['MEMCACHED_ENABLED', 'MEMCACHED_HOST', 'MEMCACHED_PORT'] as $key)
+            foreach (['MEMCACHED_ENABLED'] as $key)
             {
                 self::$originalEnv[$key] = getenv($key);
             }
@@ -182,15 +182,8 @@
 
         public function testCsrfFieldAndMetaCarryTheSessionToken(): void
         {
-            $port = MemcachedServer::start();
-            if ($port === null)
-            {
-                $this->markTestSkipped('The memcached extension and server binary are required');
-            }
-
             putenv('MEMCACHED_ENABLED=1');
-            putenv('MEMCACHED_HOST=127.0.0.1');
-            putenv('MEMCACHED_PORT=' . $port);
+            FakeMemcached::reset();
             WebSessionFixture::install(WebSessionFixture::makeRequest());
 
             $field = $this->capture(fn() => Functions::csrfField());

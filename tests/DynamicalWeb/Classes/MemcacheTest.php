@@ -2,16 +2,14 @@
 
     namespace DynamicalWeb\Classes;
 
-    use DynamicalWeb\Tests\Fixtures\MemcachedServer;
-    use Memcached;
+    use DynamicalWeb\Tests\Fixtures\FakeMemcached;
     use PHPUnit\Framework\TestCase;
     use ReflectionClass;
 
     class MemcacheTest extends TestCase
     {
-        private const array ENV_KEYS = ['MEMCACHED_ENABLED', 'MEMCACHED_HOST', 'MEMCACHED_PORT', 'MEMCACHED_KEY_PREFIX'];
+        private const array ENV_KEYS = ['MEMCACHED_ENABLED', 'MEMCACHED_KEY_PREFIX'];
 
-        private static ?int $port = null;
         private static array $originalEnv = [];
 
         public static function setUpBeforeClass(): void
@@ -20,8 +18,6 @@
             {
                 self::$originalEnv[$key] = getenv($key);
             }
-
-            self::$port = MemcachedServer::start();
         }
 
         public static function tearDownAfterClass(): void
@@ -54,22 +50,16 @@
 
         private function enableMemcache(?string $prefix = null): void
         {
-            if (self::$port === null)
-            {
-                $this->markTestSkipped('The memcached extension and server binary are required');
-            }
-
             putenv('MEMCACHED_ENABLED=1');
-            putenv('MEMCACHED_HOST=127.0.0.1');
-            putenv('MEMCACHED_PORT=' . self::$port);
             if ($prefix !== null)
             {
                 putenv('MEMCACHED_KEY_PREFIX=' . $prefix);
             }
 
             self::resetMemcache();
+            FakeMemcached::reset();
+            FakeMemcached::attachToMemcache();
             $this->assertTrue(Memcache::isAvailable());
-            Memcache::getClient()->flush();
         }
 
         // Disabled behaviour
@@ -92,11 +82,6 @@
 
         public function testEnabledValuesAreCaseInsensitive(): void
         {
-            if (!class_exists(Memcached::class))
-            {
-                $this->markTestSkipped('The memcached extension is required');
-            }
-
             foreach (['1', 'true', 'TRUE', 'Yes', 'on'] as $value)
             {
                 putenv('MEMCACHED_ENABLED=' . $value);
@@ -204,7 +189,7 @@
 
             Memcache::store('short_lived', 'value', 1);
             $this->assertTrue(Memcache::exists('short_lived'));
-            sleep(2);
+            FakeMemcached::advance(2);
             $this->assertFalse(Memcache::exists('short_lived'));
         }
 
@@ -216,7 +201,7 @@
 
             Memcache::store('touched', 'value', 1);
             $this->assertTrue(Memcache::touch('touched', 60));
-            sleep(2);
+            FakeMemcached::advance(2);
             $this->assertSame('value', Memcache::fetch('touched'));
         }
 
@@ -269,8 +254,7 @@
 
             Memcache::store('namespaced', 'value');
 
-            $raw = new Memcached();
-            $raw->addServer('127.0.0.1', self::$port);
+            $raw = new FakeMemcached();
             $this->assertSame('value', $raw->get('dw_app_namespaced'));
             $this->assertFalse($raw->get('namespaced'));
         }
@@ -282,8 +266,7 @@
             $this->assertSame('federation_', Memcache::getKeyPrefix());
             Memcache::store('kernel', 'value');
 
-            $raw = new Memcached();
-            $raw->addServer('127.0.0.1', self::$port);
+            $raw = new FakeMemcached();
             $this->assertSame('value', $raw->get('federation_kernel'));
             $this->assertFalse($raw->get('dw_app_kernel'));
         }
@@ -292,8 +275,7 @@
         {
             $this->enableMemcache();
 
-            $raw = new Memcached();
-            $raw->addServer('127.0.0.1', self::$port);
+            $raw = new FakeMemcached();
             $raw->set('dw_sess_abc', ['session' => true]);
 
             $this->assertFalse(Memcache::exists('dw_sess_abc'));
@@ -307,7 +289,7 @@
 
             $stats = Memcache::stats();
             $this->assertIsArray($stats);
-            $this->assertArrayHasKey('127.0.0.1:' . self::$port, $stats);
+            $this->assertNotEmpty($stats);
         }
 
         public function testClientIsReused(): void

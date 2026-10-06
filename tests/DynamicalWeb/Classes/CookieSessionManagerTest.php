@@ -5,16 +5,15 @@
     use DynamicalWeb\Enums\RequestMethod;
     use DynamicalWeb\Objects\CookieSession;
     use DynamicalWeb\Objects\Response;
-    use DynamicalWeb\Tests\Fixtures\MemcachedServer;
+    use DynamicalWeb\Tests\Fixtures\FakeMemcached;
     use DynamicalWeb\Tests\Fixtures\WebSessionFixture;
     use DynamicalWeb\WebSession;
     use PHPUnit\Framework\TestCase;
 
     class CookieSessionManagerTest extends TestCase
     {
-        private const array ENV_KEYS = ['MEMCACHED_ENABLED', 'MEMCACHED_HOST', 'MEMCACHED_PORT', 'MEMCACHED_SESSION_TTL', 'MEMCACHED_SESSION_SLIDING', 'MEMCACHED_SESSION_BIND_IP'];
+        private const array ENV_KEYS = ['MEMCACHED_ENABLED', 'MEMCACHED_SESSION_TTL', 'MEMCACHED_SESSION_SLIDING', 'MEMCACHED_SESSION_BIND_IP'];
 
-        private static ?int $port = null;
         private static array $originalEnv = [];
 
         public static function setUpBeforeClass(): void
@@ -23,8 +22,6 @@
             {
                 self::$originalEnv[$key] = getenv($key);
             }
-
-            self::$port = MemcachedServer::start();
         }
 
         public static function tearDownAfterClass(): void
@@ -38,20 +35,13 @@
 
         protected function setUp(): void
         {
-            if (self::$port === null)
-            {
-                $this->markTestSkipped('The memcached extension and server binary are required');
-            }
-
             foreach (self::ENV_KEYS as $key)
             {
                 putenv($key);
             }
 
             putenv('MEMCACHED_ENABLED=1');
-            putenv('MEMCACHED_HOST=127.0.0.1');
-            putenv('MEMCACHED_PORT=' . self::$port);
-            MemcachedServer::flush();
+            FakeMemcached::reset();
             WebSessionFixture::install(WebSessionFixture::makeRequest());
         }
 
@@ -62,7 +52,7 @@
 
         private function storedSession(string $sessionId): array|false
         {
-            return MemcachedServer::client()->get('dw_sess_' . $sessionId);
+            return (new FakeMemcached())->get('dw_sess_' . $sessionId);
         }
 
         // SameSite
@@ -139,7 +129,7 @@
         {
             putenv('MEMCACHED_SESSION_SLIDING=1');
             $legacy = new CookieSession('legacy-session', ['user' => 1]);
-            MemcachedServer::client()->set('dw_sess_legacy-session', $legacy->toArray());
+            (new FakeMemcached())->set('dw_sess_legacy-session', $legacy->toArray());
 
             $response = WebSessionFixture::install(WebSessionFixture::makeRequest(['cookies' => ['web_session' => 'legacy-session']]));
             $this->assertNotNull(WebSession::getCookieSession());
