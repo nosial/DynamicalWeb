@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.21] - 2026-10-06
 
-This is an ongoing update
+This update introduces new features to DynamicalWeb and bug fixes. This update also introduces a new Memecache API
+layer for Web Applications to use
 
 ### Added
  - Added `DynamicalWeb\Classes\Memcache` to expose DynamicalWeb's Memcached instance to web applications as a
