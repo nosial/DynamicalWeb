@@ -5,9 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.21] - Ongoing
+## [1.0.21] - 2026-10-06
 
 This is an ongoing update
+
+### Added
+ - Added `DynamicalWeb\Classes\Memcache` to expose DynamicalWeb's Memcached instance to web applications as a
+   general-purpose shared cache, keys are namespaced via `MEMCACHED_KEY_PREFIX` (default `dw_app_`) ([#1](https://github.com/nosial/DynamicalWeb/issues/1))
+ - Added `MEMCACHED_SESSION_SLIDING` to renew the session cookie's expiry whenever the session is read, keeping the
+   attributes (path, domain, `SameSite`) the session was created with
+ - Added `MEMCACHED_SESSION_BIND_IP` to leave the client IP out of session fingerprints; IP-bound sessions are moved to
+   the new fingerprint instead of ending
+ - Added CSRF protection: `WebSession::getCsrfToken()`, `WebSession::verifyCsrfToken()`, `Functions::csrfField()`,
+   `Functions::csrfMeta()`, the `csrf_protection` application option and the `csrf_exempt` route option
+ - Added `Functions::getl()`, `Functions::hasl()` and `Functions::getActiveLocaleId()` to use locale strings without printing them
+ - Added `WebSession::redirectTo()`, `WebSession::redirectToRoute()`, `WebSession::respondJson()` and `WebSession::abort()`,
+   which send the response and end the request, and `DynamicalWeb::renderResponseHandler()`
+ - Added flash values in cookie sessions: `WebSession::flash()`, `WebSession::getFlash()` and `WebSession::hasFlash()`
+ - Added the `headers` application option for response headers set on every response
+ - Added `only`, `except` and `websocket` filters for `pre_request` / `post_request` entries
+ - Added `Functions::getAbsoluteRouteUrl()`
+ - Added `Request::getIntParameter()`, `Request::getBoolParameter()` and `Request::getStringParameter()`
+ - Added `DynamicalWeb\Classes\RequestCache`, an in-process cache that lasts for one request
+ - Added an optional `$sameSite` parameter to `Response::setCookie()`
+
+### Changed
+ - `WebSession::getCookieSession()` returns the same `CookieSession` instance for every call within a request, so a
+   change saved by one caller is not overwritten by another caller saving an older copy
+
+### Fixed
+ - The `$sameSite` argument of `WebSession::createCookieSession()` was ignored and every session cookie was sent as `Lax`
+ - A WebSocket request whose session fingerprint did not match (it arrives through the local bridge) deleted the
+   browser's session and expired its cookie
 
 
 ## [1.0.20] - 2026-08-24
