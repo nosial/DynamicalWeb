@@ -37,6 +37,8 @@ to create web applications with PHP and deploy them using ncc.
     * [Inserting Sections](#inserting-sections)
   * [WebSession](#websession)
     * [Session Variables](#session-variables)
+    * [Responding and Ending the Request](#responding-and-ending-the-request)
+    * [Flash Messages](#flash-messages)
   * [Routing](#routing)
     * [Route Parameters](#route-parameters)
     * [Route Parameter Constraints](#route-parameter-constraints)
@@ -49,6 +51,7 @@ to create web applications with PHP and deploy them using ncc.
       * [Global Section](#global-section)
   * [Static Resources](#static-resources)
   * [Pre and Post Request Scripts](#pre-and-post-request-scripts)
+    * [Limiting Scripts to Routes](#limiting-scripts-to-routes)
   * [WebSocket Support](#websocket-support)
     * [Architecture](#architecture)
     * [WebSocket Execution Flow](#websocket-execution-flow)
@@ -57,6 +60,7 @@ to create web applications with PHP and deploy them using ncc.
     * [WebSocket API](#websocket-api)
     * [Deployment](#deployment)
   * [XSS Protection](#xss-protection)
+  * [Configured Response Headers](#configured-response-headers)
   * [Debug Panel](#debug-panel)
   * [Built-in Pages](#built-in-pages)
   * [APCu Caching](#apcu-caching)
@@ -73,6 +77,10 @@ to create web applications with PHP and deploy them using ncc.
     * [Security](#security)
     * [Advanced Usage via CookieSessionManager](#advanced-usage-via-cookiesessionmanager)
     * [Docker Deployment](#docker-deployment)
+  * [CSRF Protection](#csrf-protection)
+  * [Request Cache](#request-cache)
+  * [Memcached Cache](#memcached-cache)
+    * [Memcache API](#memcache-api)
   * [Deployment](#deployment-1)
     * [Docker](#docker)
     * [Nginx Configuration](#nginx-configuration)
@@ -355,8 +363,8 @@ and among other configurable properties.
 | `report_errors`           | No       | True                                | `boolean`       | When True, any unhandled exceptions will result in DynamicalWeb displaying the exception details. Not recommended for production                                                                         |
 | `xss_level`               | No       | 1                                   | `integer` (0-3) | XSS Level protection, when enabled DynamicalWeb will inject xss-protection related headers. 0=Disabled, 1=Low, 2=Medium 3=High                                                                           |
 | `debug_panel`             | No       | True                                | `boolean`       | When True, a debug iFrame is injected in the resulting HTML responses which contains detailed information about the web environment. Not recommended for production, adds a performance hit when enabled |
-| `pre_request`             | No       | `['authentication.php', 'foo.php']` | `array`         | An array of php scripts (Based from `root`) to execute in order before processing the http request                                                                                                       |
-| `post_request`            | No       | `['cleanup.php', 'bar.php']`        | `array`         | An array of php scripts (Based from `root`) to execute in order after processing the http request                                                                                                        |
+| `pre_request`             | No       | `['authentication.php', 'foo.php']` | `array`         | An array of php scripts (Based from `root`) to execute in order before processing the http request, entries can be limited to routes, see [Limiting Scripts to Routes](#limiting-scripts-to-routes)      |
+| `post_request`            | No       | `['cleanup.php', 'bar.php']`        | `array`         | An array of php scripts (Based from `root`) to execute in order after processing the http request, entries can be limited to routes, see [Limiting Scripts to Routes](#limiting-scripts-to-routes)       |
 | `disable_apcu`            | No       | True                                | `boolean`       | When True, the use of the APCu cache layer is disabled, otherwise DynamicalWeb will use APCu if it's available to cache properties and small resource files when running the WebApplication              |
 | `disable_default_headers` | No       | True                                | `boolean`       | When True, DynamicalWeb omits builtin headers like `X-Powered-By` and `X-Request-ID` from being used in the http response                                                                                |
 | `static_cache_max_age`    | No       | 3600                                | `integer`       | The max-age value in seconds used in the `Cache-Control` header when serving static files. Set to `0` to disable cache headers. Defaults to `3600` (1 hour)                                              |
@@ -364,6 +372,8 @@ and among other configurable properties.
 | `apcu_content_ttl`        | No       | 3600                                | `integer`       | The TTL in seconds for static file content cached in APCu. Defaults to `3600` (1 hour)                                                                                                                   |
 | `apcu_meta_ttl`           | No       | 10                                  | `integer`       | The TTL in seconds for file metadata (modification time and size) cached in APCu. Defaults to `10` seconds                                                                                               |
 | `apcu_config_ttl`         | No       | 60                                  | `integer`       | The TTL in seconds for the parsed web configuration cached in APCu. Defaults to `60` (1 minute)                                                                                                          |
+| `csrf_protection`         | No       | True                                | `boolean`       | When True, `POST`, `PUT` and `DELETE` requests must carry the session's CSRF token, see [CSRF Protection](#csrf-protection). Defaults to `false`                                                         |
+| `headers`                 | No       | `{ X-Frame-Options: "DENY" }`       | `object`        | Response headers added to every response, such as security headers, see [Configured Response Headers](#configured-response-headers). Defaults to none                                                    |
 
 
 ### Locales Section
@@ -453,6 +463,7 @@ A route object should have the following properties:
 | `module`          | Yes      | "users.phtml"     | `string` | The path to the module that will handle the route, this should be a valid `.phtml` or `.php` file based from the `root` directory                                                                                          |
 | `allowed_methods` | Yes      | [ "GET", "POST" ] | `array`  | An array of allowed http methods for the route, if the incoming request method is not in this array, a 405 Method Not Allowed response will be returned, the special value `*` can be used to allow all methods            |
 | `locale_id`       | No       | "home"            | `string` | The locale ID to use when rendering the module for this route, this should be a valid locale ID that is configured in the `locales` section, if not set, the default locale will be used                                   |
+| `csrf_exempt`     | No       | true              | `bool`   | When the application's `csrf_protection` is enabled, lets this route accept state-changing requests without a CSRF token, for example a webhook or an API authenticated by other means. Defaults to `false`                |
 
 
 ## DynamicalWeb Execution Flow
@@ -531,6 +542,22 @@ incoming http request including parsed information if available
 | `getDetectedLanguage()`                          | `?string`              | Returns the detected ISO 639-1 language code from the `Accept-Language` header                                                                                       |
 | `getUserAgent()`                                 | `?UserAgent`           | Returns the parsed User-Agent object, see [User Agent Detection](#user-agent-detection) for more details                                                             |
 | `getUserAgentString()`                           | `?string`              | Returns the raw User-Agent header string                                                                                                                             |
+
+Typed getters read from the merged parameters and return the default when the value is missing or of the wrong type,
+so query strings like `?page=abc` or `?page[]=1` never reach your code as unexpected values:
+
+| Method                                                                              | Return Type | Description                                                              |
+|-------------------------------------------------------------------------------------|-------------|--------------------------------------------------------------------------|
+| `getIntParameter(string $name, ?int $default=null, ?int $min=null, ?int $max=null)` | `?int`      | Returns a whole number, clamped to `$min`/`$max` when given              |
+| `getBoolParameter(string $name, ?bool $default=null)`                               | `?bool`     | Returns a boolean for `1`/`0`, `true`/`false`, `yes`/`no` and `on`/`off` |
+| `getStringParameter(string $name, ?string $default=null, bool $trim=false)`         | `?string`   | Returns a string, ignoring array values, optionally trimmed              |
+
+```php
+<?php
+    $page = WebSession::getRequest()->getIntParameter('page', 1, min: 1);
+    $includeClosed = WebSession::getRequest()->getBoolParameter('closed', false);
+?>
+```
 
 Here's an example of how to use the request object within a module:
 
@@ -916,6 +943,28 @@ home:
 The `printl()` method will look up the string using the active locale section (e.g., `home`) and the given key
 (e.g., `page_title`), and replace any `{placeholder}` tokens with the values from the provided array.
 
+To use a localized string in PHP code rather than print it, for example for a page title, a flash message or a JSON
+response, use `Functions::getl()`. It resolves the key exactly like `printl()` and returns the unescaped string:
+
+```php
+<?php
+    use DynamicalWeb\Html\Functions;
+
+    $title = Functions::getl('page_title');
+    $message = Functions::getl('welcome_message', ['name' => $userName]);
+
+    // Like printl(), a missing key throws; pass a default to get that instead
+    $label = Functions::getl($statusKey, default: $statusKey);
+
+    if (Functions::hasl($statusKey))
+    {
+        // The key is defined for the active section (or the global section)
+    }
+?>
+```
+
+`Functions::getActiveLocaleId()` returns the locale section `printl()`/`getl()` currently resolve from.
+
 
 ### Printing Route URLs
 
@@ -938,6 +987,15 @@ for creating links between pages without hardcoding paths:
 This method resolves the route by its ID, builds the URL from the automatically detected base URL (scheme and host
 from the current HTTP request) and `base_path`, substitutes
 any `{variable}` placeholders in the route path with the provided values, and appends optional GET query parameters.
+
+`Functions::getRouteUrl()` returns the same root-relative URL instead of printing it. When a full address is needed,
+such as a canonical link, an Open Graph tag or a link in an e-mail, `Functions::getAbsoluteRouteUrl()` takes the same
+arguments and prefixes the scheme and host of the current request:
+
+```php
+<link rel="canonical" href="<?php Functions::print(Functions::getAbsoluteRouteUrl('report', ['id' => $id])); ?>">
+<!-- https://example.com/reports/123 -->
+```
 
 
 ### Inserting Sections
@@ -1056,6 +1114,60 @@ Here's an example of using session variables to pass data from a pre-request scr
 ?>
 
 <h1>Welcome, <?php \DynamicalWeb\Html\Functions::print($user->getName()); ?></h1>
+```
+
+
+### Responding and Ending the Request
+
+These methods prepare the response, send it and end the request immediately, so no code after them runs:
+
+| Method                                                                                                              | Description                                                                                                                           |
+|---------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| `redirectTo(string $url, ?ResponseCode $statusCode = null)`                                                         | Redirects to a URL (302 by default)                                                                                                   |
+| `redirectToRoute(string $id, array $pathVariables = [], array $queryParams = [], ?ResponseCode $statusCode = null)` | Redirects to a named route                                                                                                            |
+| `respondJson(mixed $data, ResponseCode\|int $statusCode = ResponseCode::OK)`                                        | Sends a JSON response                                                                                                                 |
+| `abort(ResponseCode\|int $statusCode, ?string $message = null)`                                                     | Sends an error response: the router's `response_handlers` page for the code when configured, otherwise (or with a message) plain text |
+
+```php
+<?php
+    use DynamicalWeb\Enums\ResponseCode;
+    use DynamicalWeb\WebSession;
+
+    if (!$canEdit)
+    {
+        WebSession::abort(ResponseCode::FORBIDDEN);
+    }
+
+    if ($request->getParameter('format') === 'json')
+    {
+        WebSession::respondJson(['report' => $report->toArray()]);
+    }
+
+    $client->closeReport($reportId);
+    WebSession::flash('success', 'report_closed');
+    WebSession::redirectToRoute('report_detail', ['id' => $reportId]);
+?>
+```
+
+`DynamicalWeb::renderResponseHandler(ResponseCode $code)` renders a configured response handler into the current
+response without ending the request, and returns false when none is configured.
+
+
+### Flash Messages
+
+Flash values are kept in the cookie session until they are read once, which makes them suitable for showing a
+message on the page a redirect leads to without putting it in the URL. They require [Cookie Sessions](#cookie-sessions):
+
+| Method                                                                     | Return Type | Description                                                                             |
+|----------------------------------------------------------------------------|-------------|-----------------------------------------------------------------------------------------|
+| `flash(string $key, mixed $value, ?string $cookieName = null)`             | `bool`      | Stores a value, creating the cookie session if needed; false when sessions are disabled |
+| `getFlash(string $key, mixed $default = null, ?string $cookieName = null)` | `mixed`     | Returns the value and removes it, or the default when it is not set                     |
+| `hasFlash(string $key, ?string $cookieName = null)`                        | `bool`      | Checks if a value is waiting, without removing it                                       |
+
+```php
+<?php if (WebSession::hasFlash('success')): ?>
+    <div class="alert"><?php Functions::printl(WebSession::getFlash('success')); ?></div>
+<?php endif; ?>
 ```
 
 
@@ -1460,6 +1572,33 @@ Here's an example of a pre-request authentication script:
 ```
 
 
+### Limiting Scripts to Routes
+
+An entry can also be a mapping, which limits the script to some routes instead of checking the path inside the
+script. Plain strings and mappings can be mixed:
+
+```yaml
+application:
+  pre_request:
+    - "middleware/headers.php"                 # every route
+    - module: "middleware/auth.php"
+      except: [ "login", "logout", "error" ]   # route IDs to skip
+      websocket: false                         # skip WebSocket requests
+    - module: "middleware/admin.php"
+      only: [ "operators", "operator_detail" ] # only these route IDs
+```
+
+| Name        | Required | Type              | Description                                                         |
+|-------------|----------|-------------------|---------------------------------------------------------------------|
+| `module`    | Yes      | `string`          | The script to run, based from `root`                                |
+| `only`      | No       | `array`/`string`  | Route IDs the script runs for; when set, every other route skips it |
+| `except`    | No       | `array`/`string`  | Route IDs the script is skipped for                                 |
+| `websocket` | No       | `bool`            | Set to `false` to skip the script for WebSocket requests            |
+
+`ApplicationConfiguration::getPreRequest()` and `getPostRequest()` keep returning the script paths, and
+`getPreRequestHooks()` / `getPostRequestHooks()` return the entries with their filters.
+
+
 ## WebSocket Support
 
 DynamicalWeb has native support for handling WebSocket connections through integration with the
@@ -1718,6 +1857,24 @@ Additionally, the `Functions::print()` method HTML-escapes output by default usi
 template level.
 
 
+## Configured Response Headers
+
+Headers listed under `headers` in the application configuration are added to every response, which is the place
+for security headers that would otherwise be set by a pre-request script:
+
+```yaml
+application:
+  headers:
+    X-Frame-Options: "DENY"
+    X-Content-Type-Options: "nosniff"
+    Referrer-Policy: "same-origin"
+    Content-Security-Policy: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+```
+
+They are set before pre-request scripts run, so a pre-request script or module can still override or remove one for
+a particular response with `WebSession::getResponse()->setHeader()` or `removeHeader()`.
+
+
 ## Debug Panel
 
 The debug panel is a development tool that, when enabled, injects an iFrame into the bottom of every HTML response
@@ -1851,13 +2008,15 @@ and ensure Memcached is running.
 
 Cookie Sessions are configured exclusively through environment variables:
 
-| Variable                       | Default              | Description                                                    |
-|--------------------------------|----------------------|----------------------------------------------------------------|
-| `MEMCACHED_ENABLED`            | —                    | Set to `1`, `true`, `yes`, or `on` to enable                   |
-| `MEMCACHED_HOST`               | `127.0.0.1`          | Memcached server host                                          |
-| `MEMCACHED_PORT`               | `11211`              | Memcached server port                                          |
-| `MEMCACHED_SESSION_TTL`        | `3600`               | Session time-to-live in seconds                                |
-| `MEMCACHED_SESSION_SECRET`     | *(internal default)* | HMAC secret key used for fingerprint verification              |
+| Variable                    | Default              | Description                                                                                                      |
+|-----------------------------|----------------------|------------------------------------------------------------------------------------------------------------------|
+| `MEMCACHED_ENABLED`         | —                    | Set to `1`, `true`, `yes`, or `on` to enable                                                                     |
+| `MEMCACHED_HOST`            | `127.0.0.1`          | Memcached server host                                                                                            |
+| `MEMCACHED_PORT`            | `11211`              | Memcached server port                                                                                            |
+| `MEMCACHED_SESSION_TTL`     | `3600`               | Session time-to-live in seconds                                                                                  |
+| `MEMCACHED_SESSION_SECRET`  | *(internal default)* | HMAC secret key used for fingerprint verification                                                                |
+| `MEMCACHED_SESSION_SLIDING` | `0`                  | Set to `1` to renew the session cookie's expiry whenever the session is read, so the TTL becomes an idle timeout |
+| `MEMCACHED_SESSION_BIND_IP` | `1`                  | Set to `0` to leave the client IP out of the session fingerprint (the User-Agent is still checked)               |
 
 
 ### Basic Usage
@@ -2041,14 +2200,14 @@ The `CookieSession` object provides the following methods:
 
 ### WebSession API
 
-| Method                                                                                                         | Return Type             | Description                                                    |
-|----------------------------------------------------------------------------------------------------------------|-------------------------|----------------------------------------------------------------|
-| `getCookieSessionManager()`                                                                                    | `?CookieSessionManager` | Returns the manager if Memcached is enabled and connected      |
-| `hasCookieSession(?string $cookieName = null)`                                                                 | `bool`                  | Returns true if a valid session exists for the current request |
-| `getCookieSession(?string $cookieName = null)`                                                                 | `?CookieSession`        | Retrieves the current session (with fingerprint verification)  |
+| Method                                                                                                                                 | Return Type             | Description                                                    |
+|----------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------------------------------------------------------------|
+| `getCookieSessionManager()`                                                                                                            | `?CookieSessionManager` | Returns the manager if Memcached is enabled and connected      |
+| `hasCookieSession(?string $cookieName = null)`                                                                                         | `bool`                  | Returns true if a valid session exists for the current request |
+| `getCookieSession(?string $cookieName = null)`                                                                                         | `?CookieSession`        | Retrieves the current session (with fingerprint verification)  |
 | `createCookieSession(array $data, ?string $cookieName, string $path, string $domain, ?bool $secure, bool $httpOnly, string $sameSite)` | `?CookieSession`        | Creates a new session and sets the session cookie              |
-| `saveCookieSession(CookieSession $session)`                                                                    | `bool`                  | Persists session changes to Memcached                          |
-| `destroyCookieSession(?string $cookieName, string $path, string $domain)`                                      | `bool`                  | Deletes the session from Memcached and expires the cookie      |
+| `saveCookieSession(CookieSession $session)`                                                                                            | `bool`                  | Persists session changes to Memcached                          |
+| `destroyCookieSession(?string $cookieName, string $path, string $domain)`                                                              | `bool`                  | Deletes the session from Memcached and expires the cookie      |
 
 ### Security
 
@@ -2064,7 +2223,17 @@ Cookie Sessions include built-in protection against session hijacking:
   from accessing the session identifier
 - **Secure Cookies** — The session cookie is marked `Secure` when the request is made over HTTPS
 - **TTL Refresh** — The session TTL is refreshed on every access via `Memcached::touch()`, keeping active
-  sessions alive while expired sessions are automatically cleaned up by Memcached
+  sessions alive while expired sessions are automatically cleaned up by Memcached. The browser cookie keeps the
+  expiry it was created with unless `MEMCACHED_SESSION_SLIDING=1`, which renews it with the attributes (path, domain,
+  `SameSite`, …) the session was created with
+- **IP Binding** — By default the fingerprint includes the client IP, so a session ends when the user's address
+  changes (for example a phone switching networks). `MEMCACHED_SESSION_BIND_IP=0` keeps sessions across address
+  changes; sessions created while IP-bound are moved to the new fingerprint on their next request instead of ending
+- **WebSocket Requests** — WebSocket requests arrive through the local bridge with a different address, so a
+  fingerprint mismatch on a WebSocket request returns no session but leaves the browser's session and cookie intact
+- **One Instance per Request** — `WebSession::getCookieSession()` returns the same `CookieSession` object for every
+  call within a request, so a change saved by one part of the page is never overwritten by another part saving an
+  older copy
 
 ### Advanced Usage via CookieSessionManager
 
@@ -2105,19 +2274,19 @@ For advanced use cases, you can interact with the `CookieSessionManager` directl
 
 The `CookieSessionManager` provides the following methods:
 
-| Method                                                                                                               | Return Type      | Description                                                        |
-|----------------------------------------------------------------------------------------------------------------------|------------------|--------------------------------------------------------------------|
-| `isEnabled()`                                                                                                        | `bool`           | Returns true if Memcached is available and connected               |
-| `getCookieName()`                                                                                                    | `string`         | Returns the configured session cookie name                         |
-| `getSessionTtl()`                                                                                                    | `int`            | Returns the configured session TTL in seconds                      |
-| `hasSessionCookie(?string $cookieName = null)`                                                                       | `bool`           | Checks if the session cookie exists in the current request         |
-| `getSessionIdFromCookie(?string $cookieName = null)`                                                                 | `?string`        | Returns the session ID from the request cookie, or null            |
-| `getSession(?string $cookieName = null)`                                                                             | `?CookieSession` | Retrieves the session from Memcached with fingerprint verification |
-| `sessionExists(?string $cookieName = null)`                                                                          | `bool`           | Checks if the session exists in Memcached without loading it       |
+| Method                                                                                                                           | Return Type      | Description                                                        |
+|----------------------------------------------------------------------------------------------------------------------------------|------------------|--------------------------------------------------------------------|
+| `isEnabled()`                                                                                                                    | `bool`           | Returns true if Memcached is available and connected               |
+| `getCookieName()`                                                                                                                | `string`         | Returns the configured session cookie name                         |
+| `getSessionTtl()`                                                                                                                | `int`            | Returns the configured session TTL in seconds                      |
+| `hasSessionCookie(?string $cookieName = null)`                                                                                   | `bool`           | Checks if the session cookie exists in the current request         |
+| `getSessionIdFromCookie(?string $cookieName = null)`                                                                             | `?string`        | Returns the session ID from the request cookie, or null            |
+| `getSession(?string $cookieName = null)`                                                                                         | `?CookieSession` | Retrieves the session from Memcached with fingerprint verification |
+| `sessionExists(?string $cookieName = null)`                                                                                      | `bool`           | Checks if the session exists in Memcached without loading it       |
 | `createSession(array $data, ?string $cookieName, string $path, string $domain, ?bool $secure, bool $httpOnly, string $sameSite)` | `?CookieSession` | Creates a new session and sets the cookie in the response          |
-| `saveSession(CookieSession $session)`                                                                                | `bool`           | Persists the session data to Memcached                             |
-| `destroySession(?string $cookieName, string $path, string $domain)`                                                   | `bool`           | Deletes the session and expires the cookie                         |
-| `deleteSession(string $sessionId)`                                                                                   | `bool`           | Deletes a specific session by its ID                               |
+| `saveSession(CookieSession $session)`                                                                                            | `bool`           | Persists the session data to Memcached                             |
+| `destroySession(?string $cookieName, string $path, string $domain)`                                                              | `bool`           | Deletes the session and expires the cookie                         |
+| `deleteSession(string $sessionId)`                                                                                               | `bool`           | Deletes a specific session by its ID                               |
 
 ### Docker Deployment
 
@@ -2136,6 +2305,144 @@ services:
       - MEMCACHED_ENABLED=1
       - MEMCACHED_SESSION_TTL=7200
 ```
+
+
+## CSRF Protection
+
+DynamicalWeb can protect forms and scripts against cross-site request forgery using a random token kept in the
+cookie session. It requires [Cookie Sessions](#cookie-sessions).
+
+Put the token in every form and, for scripts, in the page head:
+
+```phtml
+<head>
+    <!-- meta tag only, or with true: also sends the token with same-origin XHR/fetch requests -->
+    <?php Functions::csrfMeta(true); ?>
+</head>
+
+<form method="post">
+    <?php Functions::csrfField(); ?>
+    ...
+</form>
+```
+
+Then enable checking in the application configuration:
+
+```yaml
+application:
+  csrf_protection: true
+router:
+  routes:
+    - id: "webhook"
+      path: "/webhook"
+      module: "webhook.php"
+      csrf_exempt: true      # authenticated by other means
+```
+
+With `csrf_protection` enabled, every `POST`, `PUT` and `DELETE` request to a route that is not `csrf_exempt` must
+send the token in the `csrf_token` field or the `X-CSRF-Token` header. Otherwise the request is answered with
+403 before pre-request scripts and the module run: JSON `{"error": "csrf_failed"}` for script requests (those
+sending the header or accepting `application/json`), otherwise the router's 403 response handler when configured,
+or plain text.
+
+The token can also be used directly, for example to check it yourself instead of enabling `csrf_protection`:
+
+| Method                                                                            | Return Type | Description                                                                                               |
+|-----------------------------------------------------------------------------------|-------------|-----------------------------------------------------------------------------------------------------------|
+| `WebSession::getCsrfToken(?string $cookieName = null)`                            | `?string`   | Returns the session's token, creating the session and token on first use; null when sessions are disabled |
+| `WebSession::verifyCsrfToken(?string $token = null, ?string $cookieName = null)`  | `bool`      | Checks a token, by default the one in the request's `csrf_token` field or `X-CSRF-Token` header           |
+| `Functions::csrfField(?string $cookieName = null)`                                | `void`      | Prints a hidden `csrf_token` input                                                                        |
+| `Functions::csrfMeta(bool $attachToRequests = false, ?string $cookieName = null)` | `void`      | Prints a `csrf-token` meta tag, and optionally the script that adds the header to requests                |
+
+
+## Request Cache
+
+`DynamicalWeb\Classes\RequestCache` is an in-process cache that lasts for one request, for lookups a page repeats
+while it renders, such as the same record resolved by several sections. It is cleared when the request starts and
+ends. It has the same `remember()` shape as [Memcache](#memcached-cache), so moving a value to a cache that lasts
+across requests is a one-word change:
+
+```php
+<?php
+    use DynamicalWeb\Classes\Memcache;
+    use DynamicalWeb\Classes\RequestCache;
+
+    // Once per request
+    $operator = RequestCache::remember('operator:' . $uuid, fn() => $client->getOperator($uuid));
+
+    // Once per minute across all requests and workers
+    $serverInfo = Memcache::remember('server_info', 60, fn() => $client->getServerInformation());
+?>
+```
+
+| Method                                        | Return Type | Description                                                                                       |
+|-----------------------------------------------|-------------|---------------------------------------------------------------------------------------------------|
+| `fetch(string $key, mixed &$success = false)` | `mixed`     | Returns the cached value, or null on a miss                                                       |
+| `store(string $key, mixed $value)`            | `void`      | Stores a value                                                                                    |
+| `exists(string $key)`                         | `bool`      | Returns true if the key is cached, even when its value is null                                    |
+| `delete(string $key)`                         | `bool`      | Removes an entry                                                                                  |
+| `remember(string $key, callable $callback)`   | `mixed`     | Returns the cached value or computes, stores and returns it; a callback that throws is not cached |
+| `clear()`                                     | `void`      | Removes every entry                                                                               |
+| `count()`                                     | `int`       | Returns the number of entries                                                                     |
+
+
+## Memcached Cache
+
+The Memcached instance used for Cookie Sessions is also exposed to web applications as a general-purpose shared cache
+through the `DynamicalWeb\Classes\Memcache` class. This lets applications cache expensive data (such as a compiled
+application kernel) across requests and worker processes without setting up an additional caching service like Redis.
+
+The cache uses the same `MEMCACHED_ENABLED`, `MEMCACHED_HOST` and `MEMCACHED_PORT` environment variables described in
+[Cookie Sessions](#cookie-sessions). Every key is transparently prefixed so application entries never collide with
+DynamicalWeb's internal session entries:
+
+| Variable               | Default   | Description                                      |
+|------------------------|-----------|--------------------------------------------------|
+| `MEMCACHED_KEY_PREFIX` | `dw_app_` | Prefix applied to every key stored by `Memcache` |
+
+All methods silently no-op when Memcached is unavailable or disabled, so applications keep working without it.
+
+```php
+<?php
+    use DynamicalWeb\Classes\Memcache;
+
+    // Compute once, then serve from Memcached for 10 minutes
+    $kernel = Memcache::remember('kernel', 600, function() {
+        return buildKernel();
+    });
+
+    // Basic operations
+    Memcache::store('greeting', 'hello', 60);
+    $value = Memcache::fetch('greeting', $success);
+    if ($success)
+    {
+        // Cache hit
+    }
+
+    // Counters
+    $views = Memcache::increment('page_views');
+```
+
+### Memcache API
+
+| Method                                                                         | Return Type      | Description                                                                |
+|--------------------------------------------------------------------------------|------------------|----------------------------------------------------------------------------|
+| `isExtensionAvailable()`                                                       | `bool`           | Returns true if the Memcached extension is loaded                          |
+| `isAvailable()`                                                                | `bool`           | Returns true if Memcached is enabled and the client was initialized        |
+| `getClient()`                                                                  | `?Memcached`     | Returns the underlying client for advanced usage (keys are still prefixed) |
+| `getKeyPrefix()`                                                               | `string`         | Returns the configured key prefix                                          |
+| `fetch(string $key, mixed &$success = false)`                                  | `mixed`          | Returns the cached value, or false on a miss                               |
+| `store(string $key, mixed $value, int $ttl = 0)`                               | `bool`           | Stores a value, overwriting any existing one                               |
+| `add(string $key, mixed $value, int $ttl = 0)`                                 | `bool`           | Stores a value only if the key does not exist                              |
+| `delete(string $key)`                                                          | `bool`           | Deletes an entry                                                           |
+| `exists(string $key)`                                                          | `bool`           | Returns true if the key exists                                             |
+| `fetchMultiple(array $keys)`                                                   | `array`          | Returns key => value for every key found                                   |
+| `storeMultiple(array $items, int $ttl = 0)`                                    | `bool`           | Stores multiple key => value pairs                                         |
+| `increment(string $key, int $offset = 1, int $initial = 0, int $ttl = 0)`      | `int\|false`     | Increments a counter, initializing it to `$initial` if missing             |
+| `decrement(string $key, int $offset = 1, int $initial = 0, int $ttl = 0)`      | `int\|false`     | Decrements a counter (never below zero), initializing it if missing        |
+| `touch(string $key, int $ttl)`                                                 | `bool`           | Updates the TTL of an existing entry                                       |
+| `remember(string $key, int $ttl, callable $callback)`                          | `mixed`          | Returns the cached value or computes, stores and returns it                |
+| `stats()`                                                                      | `array\|false`   | Returns Memcached server statistics                                        |
 
 
 ## Deployment
