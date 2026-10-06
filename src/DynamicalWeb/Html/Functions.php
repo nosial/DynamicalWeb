@@ -46,6 +46,70 @@
          */
         public static function printl(mixed $id, array $locale=[], bool $escape=true): void
         {
+            self::print(self::resolveLocaleString($id, $locale), $escape);
+        }
+
+        /**
+         * Returns a locale string instead of printing it, resolving the key exactly like {@see Functions::printl()}:
+         * from the active section's locale_id, then the current route's locale_id.
+         *
+         * @param mixed $id The ID of the locale string
+         * @param array $locale Optional, an associative array of parameters to replace in the locale string
+         * @param string|null $default Optional value to return when the key is not defined, instead of throwing
+         * @return string The (unescaped) locale string
+         * @throws RuntimeException Thrown if no locale is loaded or the key was not found and no default was given
+         */
+        public static function getl(mixed $id, array $locale=[], ?string $default=null): string
+        {
+            try
+            {
+                return self::resolveLocaleString($id, $locale);
+            }
+            catch (RuntimeException $e)
+            {
+                if ($default !== null)
+                {
+                    return $default;
+                }
+
+                throw $e;
+            }
+        }
+
+        /**
+         * Checks if a locale string is defined for the active section or the current route's locale_id.
+         *
+         * @param mixed $id The ID of the locale string
+         * @return bool True if the key is defined
+         */
+        public static function hasl(mixed $id): bool
+        {
+            $currentLocale = WebSession::getLocale();
+            $localeId = self::getActiveLocaleId();
+            return $currentLocale !== null && $localeId !== null && $currentLocale->hasKey($localeId, (string)$id);
+        }
+
+        /**
+         * Returns the locale section that printl()/getl() currently resolve from: the active section set by
+         * {@see Functions::loadLocalization()} or {@see Functions::insertSection()}, or the current route's locale_id.
+         *
+         * @return string|null The locale section ID, or null if none is active
+         */
+        public static function getActiveLocaleId(): ?string
+        {
+            return self::$activeLocaleSection ?? WebSession::getCurrentRoute()?->getLocaleId();
+        }
+
+        /**
+         * Resolves a locale string for printl() and getl().
+         *
+         * @param mixed $id The ID of the locale string
+         * @param array $locale Placeholder replacements
+         * @return string The locale string, or the key itself when no locale section is available at all
+         * @throws RuntimeException Thrown if no locale is loaded or the key was not found
+         */
+        private static function resolveLocaleString(mixed $id, array $locale): string
+        {
             $currentLocale = WebSession::getLocale();
             if ($currentLocale === null)
             {
@@ -53,7 +117,7 @@
             }
 
             // Section context takes priority; fall back to the current route's locale_id
-            $localeId = self::$activeLocaleSection ?? WebSession::getCurrentRoute()?->getLocaleId();
+            $localeId = self::getActiveLocaleId();
 
             if ($localeId === null)
             {
@@ -64,11 +128,10 @@
                     $localeId = $localeIds[0];
                 }
 
-                // Last resort: print the key as-is instead of throwing
+                // Last resort: use the key as-is instead of throwing
                 if ($localeId === null)
                 {
-                    self::print($id, $escape);
-                    return;
+                    return (string)$id;
                 }
             }
 
@@ -78,7 +141,81 @@
                 throw new RuntimeException(sprintf('Locale key "%s" not found in locale "%s" for locale_id "%s"', $id, $currentLocale->getLocaleCode(), $localeId));
             }
 
-            self::print($string, $escape);
+            return $string;
+        }
+
+        /**
+         * Prints a hidden form field carrying the session's CSRF token ({@see WebSession::getCsrfToken()}).
+         * Prints nothing when cookie sessions are disabled.
+         *
+         * @param string|null $cookieName Optional cookie name of the session. Defaults to the configured cookie name.
+         */
+        public static function csrfField(?string $cookieName=null): void
+        {
+            $token = WebSession::getCsrfToken($cookieName);
+            if ($token === null)
+            {
+                return;
+            }
+
+            print('<input type="hidden" name="' . WebSession::CSRF_FIELD_NAME . '" value="' . htmlspecialchars($token, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">');
+        }
+
+        /**
+         * Prints a `<meta name="csrf-token">` tag carrying the session's CSRF token. With $attachToRequests, also
+         * prints a script that sends the token in the X-CSRF-Token header of same-origin XMLHttpRequest and fetch()
+         * requests other than GET, HEAD and OPTIONS. Prints nothing when cookie sessions are disabled.
+         *
+         * @param bool $attachToRequests Whether to also print the script that attaches the token to requests
+         * @param string|null $cookieName Optional cookie name of the session. Defaults to the configured cookie name.
+         */
+        public static function csrfMeta(bool $attachToRequests=false, ?string $cookieName=null): void
+        {
+            $token = WebSession::getCsrfToken($cookieName);
+            if ($token === null)
+            {
+                return;
+            }
+
+            print('<meta name="csrf-token" content="' . htmlspecialchars($token, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">');
+            if (!$attachToRequests)
+            {
+                return;
+            }
+
+            $header = json_encode(WebSession::CSRF_HEADER_NAME);
+            print(<<<HTML
+<script>
+(function () {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    var token = meta ? meta.getAttribute('content') : '';
+    var header = {$header};
+    function needsToken(method, url) {
+        return token && ['GET', 'HEAD', 'OPTIONS'].indexOf(String(method || 'GET').toUpperCase()) === -1
+            && new URL(url, window.location.href).origin === window.location.origin;
+    }
+    var open = XMLHttpRequest.prototype.open, send = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (method, url) {
+        this.dwCsrf = needsToken(method, url);
+        return open.apply(this, arguments);
+    };
+    XMLHttpRequest.prototype.send = function () {
+        if (this.dwCsrf) { this.setRequestHeader(header, token); }
+        return send.apply(this, arguments);
+    };
+    if (window.fetch) {
+        var originalFetch = window.fetch;
+        window.fetch = function (input, init) {
+            var request = new Request(input, init);
+            if (needsToken(request.method, request.url) && !request.headers.has(header)) {
+                request.headers.set(header, token);
+            }
+            return originalFetch.call(this, request);
+        };
+    }
+})();
+</script>
+HTML);
         }
 
         /**
@@ -153,6 +290,28 @@
             }
 
             return $url;
+        }
+
+        /**
+         * Generates an absolute URL (scheme and host of the current request) for a named route, for places that
+         * need a full address such as canonical links, Open Graph tags or e-mails.
+         *
+         * @param string $id The route ID as defined in the web configuration.
+         * @param array $pathVariables Associative array of path variable substitutions (e.g. ['id' => '42']).
+         * @param array $queryParams Associative array of query string parameters to append (e.g. ['page' => '2']).
+         * @return string The absolute URL for the specified route
+         * @throws RuntimeException Thrown if the route cannot be resolved or there is no current request
+         */
+        public static function getAbsoluteRouteUrl(string $id, array $pathVariables = [], array $queryParams = []): string
+        {
+            $path = self::getRouteUrl($id, $pathVariables, $queryParams);
+            $request = WebSession::getRequest();
+            if ($request === null)
+            {
+                throw new RuntimeException(sprintf('Cannot build an absolute URL for route "%s": no current request', $id));
+            }
+
+            return ($request->isSecure() ? 'https' : 'http') . '://' . rtrim($request->getHost(), '/') . $path;
         }
 
         /**
