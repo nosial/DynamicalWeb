@@ -10,9 +10,13 @@ assembly:
   name: DynamicalWeb
   package: net.nosial.dynamicalweb
   version: 1.0.22
-  description: DynamicalWeb is a PHP framework for building web applications using ncc
-  license: MIT
-  url: https://github.com/nosial/DynamicalWeb
+  url: 'https://github.com/nosial/DynamicalWeb'
+  license: 'MIT'
+  description: 'DynamicalWeb is a PHP framework for building web applications using ncc'
+  author: 'Netkas <netkas@nosial.net>'
+  organization: 'Nosial'
+  product: 'Toolchain'
+  copyright: 'Copyright (c) 2022-2026 Nosial'
 dependencies:
   net.nosial.loglib2: nosial/loglib2@github
   com.symfony.yaml: symfony/yaml@packagist

@@ -1,4 +1,4 @@
-# DynamicalWeb
+# <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icon/dynamicalweb_light.svg"><img src="assets/icon/dynamicalweb_dark.svg" alt="DynamicalWeb" width="32" height="32"></picture> DynamicalWeb
 
 DynamicalWeb is a PHP framework intended to be used with [ncc](https://github.com/nosial/ncc) to create web applications.
 This framework is designed with simplicity in mind as a way to add-on to PHP's core functionality and to make it easier
@@ -93,7 +93,7 @@ to create web applications with PHP and deploy them using ncc.
 To use DynamicalWeb in your ncc project you can simply run the command:
 
 ```sh
-ncc project --generate=dynamicalweb
+ncc project --generate=web
 ```
 
 What this will do is generate files and modify your existing project files to include DynamicalWeb as a dependency and
@@ -124,7 +124,7 @@ the main web entry point of your Application, for instance a `index.php` located
    done by setting up URL rewriting rules in the web server configuration. Without this, DynamicalWeb will not be able
    to handle requests properly.
 
-When using `ncc project --generate=dynamicalweb` these files are already generated for you, the generated `Dockerfile`
+When using `ncc project --generate=web` these files are already generated for you, the generated `Dockerfile`
 is also configured to set up the web server properly to allow DynamicalWeb to handle requests.
 
 
@@ -2450,10 +2450,11 @@ All methods silently no-op when Memcached is unavailable or disabled, so applica
 
 ### Docker
 
-DynamicalWeb applications can be deployed using Docker, when you generate a project using `ncc project --generate=dynamicalweb`
-a Dockerfile, docker-compose.yml, nginx.conf and supervisord.conf are generated for you. The Docker setup uses a
-multi-stage build where the first stage compiles the ncc package and the second stage sets up a production environment
-with PHP-FPM and Nginx managed by Supervisor.
+DynamicalWeb applications can be deployed using Docker, when you generate a project using `ncc project --generate=web`
+a Dockerfile and docker-compose.yml are generated for you. The Docker setup uses a multi-stage build where the first
+stage compiles the ncc package using the `ghcr.io/nosial/ncc` image, and the second stage installs it into the
+`ghcr.io/nosial/dynamicalweb` image, which provides PHP-FPM, Nginx, Memcached, WebsocketServer and LogLib2Server
+managed by Supervisor.
 
 ```yaml
 # docker-compose.yml
