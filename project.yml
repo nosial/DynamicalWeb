@@ -9,7 +9,7 @@ repository:
 assembly:
   name: DynamicalWeb
   package: net.nosial.dynamicalweb
-  version: 1.0.22
+  version: 1.0.23
   url: 'https://github.com/nosial/DynamicalWeb'
   license: 'MIT'
   description: 'DynamicalWeb is a PHP framework for building web applications using ncc'
