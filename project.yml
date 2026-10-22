@@ -4,7 +4,7 @@ update_source: nosial/dynamicalweb@n64
 repository:
   name: n64
   type: github
-  host: github.com
+  host: git.n64.cc
   ssl: true
 assembly:
   name: DynamicalWeb

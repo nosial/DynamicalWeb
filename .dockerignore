@@ -1,0 +1,8 @@
+**/.git
+**/.idea
+**/.vscode
+.claude
+.github
+target
+node_modules
+*.log
