@@ -5,9 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.22] - Ongoing
+## [1.0.22] - 2026-10-22
 
-This is an ongoing update
+This update brings the project up to date with ncc 3.1.11
 
 ### Changed
  - Included the project's light and dark icons from NosialFrontier in the README header.
