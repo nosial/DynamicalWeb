@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.23] - Ongoing
 
-This is an ongoing update
+This update introduces support for rendering markdown files
+
+### Added
+ - Added `Functions::printMarkdown()` and `Functions::getMarkdown()` to render Markdown from a local file or any URL
+   `file_get_contents()` supports (http, https, ftp, file, data, ...) as HTML, sanitized by default
+ - Added `DynamicalWeb\Classes\MarkdownRenderer` to render Markdown strings, backed by `fastvolt/markdown`
+
+### Changed
+ - `Functions::insertSection()` now resolves relative paths through the same helper as `Functions::getMarkdown()`; when
+   called outside of an executing page, relative paths resolve against the calling file instead of one frame above it
 
 
 ## [1.0.22] - 2026-10-22
