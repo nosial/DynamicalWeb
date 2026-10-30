@@ -35,6 +35,7 @@ to create web applications with PHP and deploy them using ncc.
     * [Printing Locale Strings](#printing-locale-strings)
     * [Printing Route URLs](#printing-route-urls)
     * [Inserting Sections](#inserting-sections)
+    * [Rendering Markdown](#rendering-markdown)
   * [WebSession](#websession)
     * [Session Variables](#session-variables)
     * [Responding and Ending the Request](#responding-and-ending-the-request)
@@ -1050,6 +1051,65 @@ Relative paths are resolved against the directory of the file that calls `insert
 (starting with `/`) are used as-is.
 
 
+### Rendering Markdown
+
+The `Functions::printMarkdown()` method converts a Markdown source into HTML and outputs it inline, and
+`Functions::getMarkdown()` returns the same HTML instead of printing it. Markdown is converted with
+[fastvolt/markdown](https://github.com/fastvolt/markdown).
+
+```php
+\DynamicalWeb\Html\Functions::printMarkdown(string $source, bool $sanitize = true): void
+\DynamicalWeb\Html\Functions::getMarkdown(string $source, bool $sanitize = true): string
+```
+
+The source is read the same way `file_get_contents()` reads it, so it can be:
+
+ - A local file path, absolute or relative to the calling file (resolved like `insertSection()`)
+ - Any URL supported by a PHP stream wrapper, such as `http://`, `https://`, `ftp://`, `file://` or `data://`
+
+```phtml
+<?php use DynamicalWeb\Html\Functions; ?>
+
+<!-- A Markdown file next to this template -->
+<article><?php Functions::printMarkdown('content/about.md'); ?></article>
+
+<!-- A remote Markdown file -->
+<article><?php Functions::printMarkdown('https://example.com/CHANGELOG.md'); ?></article>
+```
+
+With `$sanitize` enabled (the default), raw HTML in the Markdown is escaped and links with unsafe schemes such as
+`javascript:` are removed. Only pass `false` for Markdown from a trusted source, such as files that ship with the
+application.
+
+Local files are rendered once and cached in APCu until the file's modification time or size changes. Every source is
+also cached in the [Request Cache](#request-cache), so rendering the same source twice in one request reads it once.
+Remote sources are fetched with a 10 second timeout and are not cached across requests; to cache one, wrap the call
+in [Memcache](#memcached-cache):
+
+```php
+<?php
+    use DynamicalWeb\Classes\Memcache;
+    use DynamicalWeb\Html\Functions;
+
+    $notes = Memcache::remember('release_notes', 300, fn() => Functions::getMarkdown('https://example.com/CHANGELOG.md'));
+?>
+```
+
+Both methods throw a `RuntimeException` when the source cannot be read. To render Markdown you already have as a
+string, for example text from a database or an API, use `DynamicalWeb\Classes\MarkdownRenderer::render()`:
+
+```php
+<?php
+    use DynamicalWeb\Classes\MarkdownRenderer;
+    use DynamicalWeb\Html\Functions;
+?>
+
+<div class="description"><?php Functions::print(MarkdownRenderer::render($report->getDescription()), false); ?></div>
+```
+
+Rendered sources are listed in the debug panel's profiler as `MARKDOWN` entries.
+
+
 ## WebSession
 
 The `WebSession` class is a static class that acts as the central access point during a request's lifecycle,
@@ -1945,6 +2005,7 @@ The following data is cached in APCu when available:
 | Built-in Resource Existence | `dw_builtin_res_{path_md5}`               | 60s     | Whether a built-in resource file exists on disk                |
 | File Metadata               | `dw_filemeta_{file_md5}`                  | 10s     | File modification time and size                                |
 | File Content                | `dw_filecontent_{file_md5}`               | 3600s   | Content of small static files (≤ 256KB)                        |
+| Rendered Markdown           | `dw_markdown_{source_md5}`                | none    | HTML of local Markdown files, replaced when the file changes   |
 
 In addition to APCu, DynamicalWeb also maintains in-process static caches for route regex patterns and resource
 existence checks that persist for the duration of a single request.
