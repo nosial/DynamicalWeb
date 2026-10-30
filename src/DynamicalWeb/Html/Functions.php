@@ -4,6 +4,7 @@
 
     use DynamicalWeb\Classes\DebugPanel;
     use DynamicalWeb\Classes\ExecutionHandler;
+    use DynamicalWeb\Classes\MarkdownRenderer;
     use DynamicalWeb\Exceptions\ExecutionException;
     use DynamicalWeb\Interfaces\StringInterface;
     use DynamicalWeb\WebSession;
@@ -325,23 +326,7 @@ HTML);
          */
         public static function insertSection(string $path, ?string $localizationId = null): void
         {
-            // Resolve relative paths against the calling file's directory
-            if (strlen($path) > 0 && $path[0] !== '/' && $path[0] !== '\\' && !str_contains($path, '://'))
-            {
-                $baseDir = ExecutionHandler::getCurrentExecutingDirectory();
-                if ($baseDir !== null)
-                {
-                    $path = $baseDir . DIRECTORY_SEPARATOR . $path;
-                }
-                else
-                {
-                    $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-                    if (isset($trace[1]['file']))
-                    {
-                        $path = dirname($trace[1]['file']) . DIRECTORY_SEPARATOR . $path;
-                    }
-                }
-            }
+            $path = self::resolvePath($path);
 
             if (!file_exists($path))
             {
@@ -383,6 +368,74 @@ HTML);
         public static function loadLocalization(string $name): void
         {
             self::$activeLocaleSection = $name;
+        }
+
+        /**
+         * Renders a Markdown source as HTML and outputs it.
+         *
+         * The source is read like file_get_contents() reads it: a local file path (absolute, or relative to the calling
+         * file like {@see Functions::insertSection()}), or any URL supported by a stream wrapper such as http://,
+         * https://, ftp://, file:// or data://.
+         *
+         * @param string $source The Markdown file path or URL
+         * @param bool $sanitize If True, raw HTML in the Markdown is escaped and unsafe link schemes (such as
+         *                       javascript:) are removed. Only disable this for Markdown from a trusted source.
+         * @throws RuntimeException Thrown if the source could not be read or converted
+         */
+        public static function printMarkdown(string $source, bool $sanitize=true): void
+        {
+            print(self::getMarkdown($source, $sanitize));
+        }
+
+        /**
+         * Renders a Markdown source as HTML and returns it instead of printing it, reading the source exactly like
+         * {@see Functions::printMarkdown()}.
+         *
+         * @param string $source The Markdown file path or URL
+         * @param bool $sanitize If True, raw HTML in the Markdown is escaped and unsafe link schemes are removed
+         * @return string The rendered HTML
+         * @throws RuntimeException Thrown if the source could not be read or converted
+         */
+        public static function getMarkdown(string $source, bool $sanitize=true): string
+        {
+            if (!MarkdownRenderer::isUrl($source))
+            {
+                $source = self::resolvePath($source);
+            }
+
+            return MarkdownRenderer::renderSource($source, $sanitize);
+        }
+
+        /**
+         * Resolves a relative path against the directory of the file being executed, or failing that, the file that
+         * called into Functions. Absolute paths and URLs are returned as-is.
+         *
+         * @param string $path The path to resolve
+         * @return string The resolved path
+         */
+        private static function resolvePath(string $path): string
+        {
+            if ($path === '' || $path[0] === '/' || $path[0] === '\\' || str_contains($path, '://'))
+            {
+                return $path;
+            }
+
+            $baseDir = ExecutionHandler::getCurrentExecutingDirectory();
+            if ($baseDir !== null)
+            {
+                return $baseDir . DIRECTORY_SEPARATOR . $path;
+            }
+
+            // The first frame outside of this class is the caller
+            foreach (debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) as $frame)
+            {
+                if (isset($frame['file']) && $frame['file'] !== __FILE__)
+                {
+                    return dirname($frame['file']) . DIRECTORY_SEPARATOR . $path;
+                }
+            }
+
+            return $path;
         }
     }
 
