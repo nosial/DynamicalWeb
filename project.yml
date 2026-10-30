@@ -20,6 +20,7 @@ assembly:
 dependencies:
   net.nosial.loglib2: nosial/loglib2@github
   com.symfony.yaml: symfony/yaml@packagist
+  com.fastvolt.markdown: fastvolt/markdown@packagist
 build_configurations:
   -
     name: debug
