@@ -199,4 +199,89 @@
             $this->assertStringContainsString('XMLHttpRequest.prototype.open', $withScript);
             $this->assertStringContainsString('window.fetch', $withScript);
         }
+
+        // Markdown
+
+        private const SAMPLE_MARKDOWN = __DIR__ . '/../../Fixtures/markdown/sample.md';
+
+        public function testGetMarkdownRendersLocalFile(): void
+        {
+            $html = Functions::getMarkdown(realpath(self::SAMPLE_MARKDOWN));
+
+            $this->assertStringContainsString('<h1>Sample Document</h1>', $html);
+            $this->assertStringContainsString('<strong>bold</strong>', $html);
+            $this->assertStringContainsString('<a href="https://example.com">link</a>', $html);
+        }
+
+        public function testGetMarkdownResolvesPathRelativeToCaller(): void
+        {
+            $this->assertSame(
+                Functions::getMarkdown(realpath(self::SAMPLE_MARKDOWN)),
+                Functions::getMarkdown('../../Fixtures/markdown/sample.md')
+            );
+        }
+
+        public function testGetMarkdownSanitizesByDefault(): void
+        {
+            $html = Functions::getMarkdown(realpath(self::SAMPLE_MARKDOWN));
+
+            $this->assertStringNotContainsString('<script>', $html);
+            $this->assertStringContainsString('&lt;script&gt;', $html);
+            $this->assertStringNotContainsString('href="javascript:', $html);
+        }
+
+        public function testGetMarkdownWithoutSanitizeKeepsRawHtml(): void
+        {
+            $html = Functions::getMarkdown(realpath(self::SAMPLE_MARKDOWN), false);
+
+            $this->assertStringContainsString("<script>alert('xss')</script>", $html);
+        }
+
+        public function testGetMarkdownReadsStreamWrappers(): void
+        {
+            $this->assertStringContainsString('<h1>Sample Document</h1>', Functions::getMarkdown('file://' . realpath(self::SAMPLE_MARKDOWN)));
+            $this->assertSame('<p><strong>inline</strong></p>', Functions::getMarkdown('data://text/plain;base64,' . base64_encode('**inline**')));
+        }
+
+        public function testGetMarkdownReadsHttpSource(): void
+        {
+            $port = 18000 + random_int(0, 999);
+            $process = proc_open([PHP_BINARY, '-S', '127.0.0.1:' . $port, '-t', dirname(realpath(self::SAMPLE_MARKDOWN))], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+            if (!is_resource($process))
+            {
+                $this->markTestSkipped('Could not start the PHP built-in web server');
+            }
+
+            try
+            {
+                for ($attempt = 0; $attempt < 50 && @fsockopen('127.0.0.1', $port) === false; $attempt++)
+                {
+                    usleep(100000);
+                }
+
+                $html = Functions::getMarkdown('http://127.0.0.1:' . $port . '/sample.md');
+                $this->assertStringContainsString('<h1>Sample Document</h1>', $html);
+
+                $this->expectException(RuntimeException::class);
+                Functions::getMarkdown('http://127.0.0.1:' . $port . '/missing.md');
+            }
+            finally
+            {
+                proc_terminate($process);
+                proc_close($process);
+            }
+        }
+
+        public function testPrintMarkdownPrintsRenderedHtml(): void
+        {
+            $source = realpath(self::SAMPLE_MARKDOWN);
+            $this->assertSame(Functions::getMarkdown($source), $this->capture(fn() => Functions::printMarkdown($source)));
+        }
+
+        public function testGetMarkdownThrowsForMissingFile(): void
+        {
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('Markdown file not found');
+            Functions::getMarkdown(__DIR__ . '/does-not-exist.md');
+        }
     }
