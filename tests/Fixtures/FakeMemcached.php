@@ -74,16 +74,17 @@
             $reflection = new ReflectionClass(Memcache::class);
             $reflection->getProperty('memcached')->setValue(null, $client);
             $reflection->getProperty('initialized')->setValue(null, true);
+            $reflection->getProperty('useApcu')->setValue(null, false);
         }
 
         /**
          * Gives WebSession a cookie session manager that uses the fake store. Does nothing when
-         * MEMCACHED_ENABLED is not set, since the manager is then disabled anyway.
+         * the manager does not use Memcached (MEMCACHED_ENABLED is not set, or SESSION_BACKEND selects another store).
          */
         public static function attachToWebSession(): void
         {
             $manager = new CookieSessionManager();
-            if (!$manager->isEnabled())
+            if ($manager->getBackend() !== 'memcached')
             {
                 return;
             }
