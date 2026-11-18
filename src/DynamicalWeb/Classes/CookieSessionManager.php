@@ -12,9 +12,8 @@
     class CookieSessionManager
     {
         private ?Memcached $memcached = null;
+        private bool $useApcu = false;
         private bool $enabled = false;
-        private string $host;
-        private int $port;
         private int $sessionTtl;
         private string $keyPrefix;
         private string $cookieName;
@@ -25,45 +24,60 @@
         /**
          * CookieSessionManager Constructor
          *
-         * Initializes the Memcached client and configuration based on environment variables.
-         * If Memcached is not enabled or fails to initialize, the manager will be disabled.
+         * Selects the session store based on environment variables. SESSION_BACKEND forces a store
+         * (memcached, apcu or none); when it is not set, Memcached is used if MEMCACHED_ENABLED is set and
+         * the extension is loaded, otherwise APCu is used when it is available. APCu sessions only live in the
+         * memory of the current process, so they suit single-process servers such as FrankenPHP and are lost
+         * when the server restarts. If no store can be used, the manager is disabled.
          */
         public function __construct()
         {
-            $enabled = getenv('MEMCACHED_ENABLED');
-            if ($enabled === false)
+            $backend = strtolower(trim((string)getenv('SESSION_BACKEND')));
+            if ($backend === 'none')
             {
                 return;
             }
 
-            $enabled = strtolower($enabled);
-            if (!in_array($enabled, ['1', 'true', 'yes', 'on'], true))
+            if ($backend === '' || $backend === 'memcached')
+            {
+                $this->initializeMemcached();
+            }
+
+            if (!$this->enabled && ($backend === '' || $backend === 'apcu') && Apcu::isAvailable())
+            {
+                $this->useApcu = true;
+                $this->enabled = true;
+            }
+
+            if (!$this->enabled)
             {
                 return;
             }
 
-            if (!class_exists('Memcached'))
-            {
-                return;
-            }
-
-            $this->host = getenv('MEMCACHED_HOST') ?: '127.0.0.1';
-            $this->port = (int)(getenv('MEMCACHED_PORT') ?: 11211);
             $this->sessionTtl = (int)(getenv('MEMCACHED_SESSION_TTL') ?: 3600);
             $this->keyPrefix = 'dw_sess_';
             $this->cookieName = 'web_session';
             $this->secret = getenv('MEMCACHED_SESSION_SECRET') ?: 'dynamicalweb_default_session_secret';
             $this->slidingExpiration = self::isTruthy(getenv('MEMCACHED_SESSION_SLIDING'), false);
             $this->bindIp = self::isTruthy(getenv('MEMCACHED_SESSION_BIND_IP'), true);
+        }
+
+        /**
+         * Initializes the Memcached client when MEMCACHED_ENABLED is set and the extension is loaded.
+         */
+        private function initializeMemcached(): void
+        {
+            if (!self::isTruthy(getenv('MEMCACHED_ENABLED'), false) || !class_exists('Memcached'))
+            {
+                return;
+            }
 
             try
             {
                 $this->memcached = new Memcached('dynamicalweb_session');
-                $serverList = $this->memcached->getServerList();
-
-                if (empty($serverList))
+                if (empty($this->memcached->getServerList()))
                 {
-                    $this->memcached->addServer($this->host, $this->port);
+                    $this->memcached->addServer(getenv('MEMCACHED_HOST') ?: '127.0.0.1', (int)(getenv('MEMCACHED_PORT') ?: 11211));
                 }
 
                 $this->enabled = true;
@@ -73,6 +87,21 @@
                 $this->memcached = null;
                 $this->enabled = false;
             }
+        }
+
+        /**
+         * Returns the name of the session store in use.
+         *
+         * @return string|null memcached, apcu, or null when the manager is disabled.
+         */
+        public function getBackend(): ?string
+        {
+            if (!$this->enabled)
+            {
+                return null;
+            }
+
+            return $this->useApcu ? 'apcu' : 'memcached';
         }
 
         /**
@@ -192,14 +221,12 @@
                 return false;
             }
 
-            if (!$this->enabled || $this->memcached === null)
+            if (!$this->enabled)
             {
                 return false;
             }
 
-            $key = $this->keyPrefix . $sessionId;
-            $this->memcached->get($key);
-            return $this->memcached->getResultCode() !== Memcached::RES_NOTFOUND;
+            return $this->storeExists($this->keyPrefix . $sessionId);
         }
 
         /**
@@ -216,7 +243,7 @@
          */
         public function createSession(array $data = [], ?string $cookieName = null, string $path = '/', string $domain = '', ?bool $secure = null, bool $httpOnly = true, string $sameSite = 'Lax'): ?CookieSession
         {
-            if (!$this->enabled || $this->memcached === null)
+            if (!$this->enabled)
             {
                 return null;
             }
@@ -281,12 +308,12 @@
          */
         public function deleteSession(string $sessionId): bool
         {
-            if (!$this->enabled || $this->memcached === null)
+            if (!$this->enabled)
             {
                 return false;
             }
 
-            return $this->memcached->delete($this->keyPrefix . $sessionId);
+            return $this->storeDelete($this->keyPrefix . $sessionId);
         }
 
         /**
@@ -300,15 +327,15 @@
          */
         private function fetchSession(string $sessionId, ?string $cookieName = null, string $path = '/', string $domain = ''): ?CookieSession
         {
-            if (!$this->enabled || $this->memcached === null)
+            if (!$this->enabled)
             {
                 return null;
             }
 
             $key = $this->keyPrefix . $sessionId;
-            $data = $this->memcached->get($key);
+            $data = $this->storeGet($key);
 
-            if ($data === false || $data === null)
+            if (!is_array($data))
             {
                 return null;
             }
@@ -332,13 +359,13 @@
                 }
                 else
                 {
-                    $this->memcached->delete($key);
+                    $this->storeDelete($key);
                     $this->removeSessionCookie($cookieName, $path, $domain);
                     return null;
                 }
             }
 
-            $this->memcached->touch($key, $this->sessionTtl);
+            $this->storeTouch($key, $data);
 
             if ($this->slidingExpiration && !$this->isWebSocketRequest())
             {
@@ -366,13 +393,96 @@
          */
         private function storeSession(CookieSession $session): bool
         {
-            if (!$this->enabled || $this->memcached === null)
+            if (!$this->enabled)
             {
                 return false;
             }
 
-            $key = $this->keyPrefix . $session->getSessionId();
-            return $this->memcached->set($key, $session->toArray(), $this->sessionTtl);
+            return $this->storeSet($this->keyPrefix . $session->getSessionId(), $session->toArray());
+        }
+
+        /**
+         * Reads a value from the session store.
+         *
+         * @param string $key The store key.
+         * @return mixed The stored value, or false when it does not exist.
+         */
+        private function storeGet(string $key): mixed
+        {
+            if ($this->useApcu)
+            {
+                return apcu_fetch($key);
+            }
+
+            return $this->memcached->get($key);
+        }
+
+        /**
+         * Writes a value to the session store with the session TTL.
+         *
+         * @param string $key The store key.
+         * @param array $value The value to store.
+         * @return bool True if the value was stored.
+         */
+        private function storeSet(string $key, array $value): bool
+        {
+            if ($this->useApcu)
+            {
+                return apcu_store($key, $value, $this->sessionTtl);
+            }
+
+            return $this->memcached->set($key, $value, $this->sessionTtl);
+        }
+
+        /**
+         * Renews the TTL of a value in the session store. APCu cannot change the TTL of an entry,
+         * so the value read by the caller is stored again.
+         *
+         * @param string $key The store key.
+         * @param array $value The value currently stored under the key.
+         * @return bool True if the TTL was renewed.
+         */
+        private function storeTouch(string $key, array $value): bool
+        {
+            if ($this->useApcu)
+            {
+                return apcu_store($key, $value, $this->sessionTtl);
+            }
+
+            return $this->memcached->touch($key, $this->sessionTtl);
+        }
+
+        /**
+         * Deletes a value from the session store.
+         *
+         * @param string $key The store key.
+         * @return bool True if the value was deleted.
+         */
+        private function storeDelete(string $key): bool
+        {
+            if ($this->useApcu)
+            {
+                return apcu_delete($key);
+            }
+
+            return $this->memcached->delete($key);
+        }
+
+        /**
+         * Checks whether a value exists in the session store.
+         *
+         * @param string $key The store key.
+         * @return bool True if the value exists.
+         */
+        private function storeExists(string $key): bool
+        {
+            if ($this->useApcu)
+            {
+                return apcu_exists($key);
+            }
+
+            $this->memcached->get($key);
+            return $this->memcached->getResultCode() !== Memcached::RES_NOTFOUND;
         }
 
         /**
