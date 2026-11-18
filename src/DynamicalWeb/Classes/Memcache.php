@@ -23,6 +23,7 @@
 
         private static ?Memcached $memcached = null;
         private static bool $initialized = false;
+        private static bool $useApcu = false;
         private static string $keyPrefix = self::DEFAULT_KEY_PREFIX;
 
         /**
@@ -34,16 +35,26 @@
         }
 
         /**
-         * Returns true when Memcached may be used: the extension must be available AND
-         * `MEMCACHED_ENABLED` must be set to `1`, `true`, `yes` or `on`.
+         * Returns true when the cache may be used: either Memcached (the extension must be available AND
+         * `MEMCACHED_ENABLED` must be set to `1`, `true`, `yes` or `on`) or the APCu fallback.
          */
         public static function isAvailable(): bool
         {
-            return self::getClient() !== null;
+            return self::getClient() !== null || self::$useApcu;
         }
 
         /**
-         * Returns the underlying Memcached client for advanced usage, or null when unavailable.
+         * Returns true when entries are kept in APCu because Memcached is not available.
+         */
+        public static function isUsingApcu(): bool
+        {
+            self::getClient();
+            return self::$useApcu;
+        }
+
+        /**
+         * Returns the underlying Memcached client for advanced usage, or null when unavailable (including when the
+         * APCu fallback is used).
          *
          * Keys passed directly to the client are still namespaced with the configured key prefix.
          *
@@ -54,7 +65,10 @@
             if (!self::$initialized)
             {
                 self::$initialized = true;
+                $prefix = getenv('MEMCACHED_KEY_PREFIX');
+                self::$keyPrefix = ($prefix === false || $prefix === '') ? self::DEFAULT_KEY_PREFIX : $prefix;
                 self::$memcached = self::createClient();
+                self::$useApcu = self::$memcached === null && Apcu::isAvailable();
             }
 
             return self::$memcached;
@@ -83,6 +97,12 @@
             $client = self::getClient();
             if ($client === null)
             {
+                if (self::$useApcu)
+                {
+                    $value = apcu_fetch(self::$keyPrefix . $key, $success);
+                    return $success ? $value : false;
+                }
+
                 $success = false;
                 return false;
             }
@@ -102,6 +122,11 @@
          */
         public static function store(string $key, mixed $value, int $ttl = 0): bool
         {
+            if (self::isUsingApcu())
+            {
+                return apcu_store(self::$keyPrefix . $key, $value, $ttl);
+            }
+
             return self::getClient()?->set($key, $value, $ttl) ?? false;
         }
 
@@ -115,6 +140,11 @@
          */
         public static function add(string $key, mixed $value, int $ttl = 0): bool
         {
+            if (self::isUsingApcu())
+            {
+                return apcu_add(self::$keyPrefix . $key, $value, $ttl);
+            }
+
             return self::getClient()?->add($key, $value, $ttl) ?? false;
         }
 
@@ -126,6 +156,11 @@
          */
         public static function delete(string $key): bool
         {
+            if (self::isUsingApcu())
+            {
+                return apcu_delete(self::$keyPrefix . $key);
+            }
+
             return self::getClient()?->delete($key) ?? false;
         }
 
@@ -155,6 +190,21 @@
                 return [];
             }
 
+            if (self::isUsingApcu())
+            {
+                $result = [];
+                foreach ($keys as $key)
+                {
+                    $value = apcu_fetch(self::$keyPrefix . $key, $success);
+                    if ($success)
+                    {
+                        $result[$key] = $value;
+                    }
+                }
+
+                return $result;
+            }
+
             $result = self::getClient()?->getMulti(array_values($keys));
             return is_array($result) ? $result : [];
         }
@@ -168,6 +218,18 @@
          */
         public static function storeMultiple(array $items, int $ttl = 0): bool
         {
+            if (self::isUsingApcu())
+            {
+                $prefixed = [];
+                foreach ($items as $key => $value)
+                {
+                    $prefixed[self::$keyPrefix . $key] = $value;
+                }
+
+                // apcu_store() returns the keys that could not be stored when given an array
+                return apcu_store($prefixed, null, $ttl) === [];
+            }
+
             return self::getClient()?->setMulti($items, $ttl) ?? false;
         }
 
@@ -185,7 +247,7 @@
             $client = self::getClient();
             if ($client === null)
             {
-                return false;
+                return self::$useApcu ? self::apcuStep($key, $offset, $initial, $ttl) : false;
             }
 
             // Binary protocol is required for initial values, so fall back to add() when the key is missing
@@ -218,7 +280,7 @@
             $client = self::getClient();
             if ($client === null)
             {
-                return false;
+                return self::$useApcu ? self::apcuStep($key, -$offset, $initial, $ttl) : false;
             }
 
             $value = $client->decrement($key, $offset);
@@ -244,7 +306,46 @@
          */
         public static function touch(string $key, int $ttl): bool
         {
+            if (self::isUsingApcu())
+            {
+                $value = apcu_fetch(self::$keyPrefix . $key, $success);
+                return $success && apcu_store(self::$keyPrefix . $key, $value, $ttl);
+            }
+
             return self::getClient()?->touch($key, $ttl) ?? false;
+        }
+
+        /**
+         * Increments (or decrements, with a negative offset) an APCu entry like Memcached does: a missing entry
+         * is initialized to `$initial`, and the value never goes below zero.
+         *
+         * @param string $key Cache key, without the prefix
+         * @param int $offset Amount to add, negative to subtract
+         * @param int $initial Initial value if the key does not exist
+         * @param int $ttl Time-to-live in seconds used when the key is initialized (0 = no expiry)
+         * @return int|false The new value, or false on failure
+         */
+        private static function apcuStep(string $key, int $offset, int $initial, int $ttl): int|false
+        {
+            $key = self::$keyPrefix . $key;
+            if (apcu_add($key, $initial, $ttl))
+            {
+                return $initial;
+            }
+
+            $value = $offset >= 0 ? apcu_inc($key, $offset, $success) : apcu_dec($key, -$offset, $success);
+            if (!$success)
+            {
+                return false;
+            }
+
+            if ($value < 0)
+            {
+                apcu_cas($key, $value, 0);
+                return 0;
+            }
+
+            return $value;
         }
 
         /**
@@ -301,8 +402,6 @@
 
             $host = getenv('MEMCACHED_HOST') ?: '127.0.0.1';
             $port = (int)(getenv('MEMCACHED_PORT') ?: 11211);
-            $prefix = getenv('MEMCACHED_KEY_PREFIX');
-            self::$keyPrefix = ($prefix === false || $prefix === '') ? self::DEFAULT_KEY_PREFIX : $prefix;
 
             try
             {
