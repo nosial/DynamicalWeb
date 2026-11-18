@@ -2057,13 +2057,14 @@ The `Cookie` object has the following properties:
 
 ## Cookie Sessions
 
-Cookie Sessions provide server-side session storage using Memcached, allowing you to persist arbitrary data across
+Cookie Sessions provide server-side session storage using Memcached or APCu, allowing you to persist arbitrary data across
 requests securely. The session data is stored on the server while only a session identifier is sent to the client
 via a cookie. This prevents client-side tampering and enables secure storage of sensitive data like authentication
 status and user identifiers.
 
-Cookie Sessions are disabled by default. To enable them, set the `MEMCACHED_ENABLED` environment variable to `1`
-and ensure Memcached is running.
+Sessions are stored in Memcached when the `MEMCACHED_ENABLED` environment variable is set to `1` and Memcached is
+running. Otherwise, they are stored in APCu when it is available (`apc.enabled`, and `disable_apcu` is not set). APCu
+memory belongs to one server process, so APCu sessions suit single-process servers.
 
 ### Configuration
 
@@ -2071,10 +2072,11 @@ Cookie Sessions are configured exclusively through environment variables:
 
 | Variable                    | Default              | Description                                                                                                      |
 |-----------------------------|----------------------|------------------------------------------------------------------------------------------------------------------|
+| `SESSION_BACKEND`           | —                    | Forces the session store: `memcached`, `apcu` or `none` (disables sessions). When unset, Memcached is used if enabled, otherwise APCu |
 | `MEMCACHED_ENABLED`         | —                    | Set to `1`, `true`, `yes`, or `on` to enable                                                                     |
 | `MEMCACHED_HOST`            | `127.0.0.1`          | Memcached server host                                                                                            |
 | `MEMCACHED_PORT`            | `11211`              | Memcached server port                                                                                            |
-| `MEMCACHED_SESSION_TTL`     | `3600`               | Session time-to-live in seconds                                                                                  |
+| `MEMCACHED_SESSION_TTL`     | `3600`               | Session time-to-live in seconds (also used by APCu sessions)                                                     |
 | `MEMCACHED_SESSION_SECRET`  | *(internal default)* | HMAC secret key used for fingerprint verification                                                                |
 | `MEMCACHED_SESSION_SLIDING` | `0`                  | Set to `1` to renew the session cookie's expiry whenever the session is read, so the TTL becomes an idle timeout |
 | `MEMCACHED_SESSION_BIND_IP` | `1`                  | Set to `0` to leave the client IP out of the session fingerprint (the User-Agent is still checked)               |
@@ -2278,13 +2280,13 @@ Cookie Sessions include built-in protection against session hijacking:
   hexadecimal strings that are cryptographically secure
 - **Fingerprint Verification** — Each session stores an HMAC-SHA256 fingerprint computed from the client's IP
   address and User-Agent string. On every `getSession()` call, the fingerprint is verified against the current
-  request. If the fingerprint does not match, the session is immediately deleted from Memcached and the cookie
+  request. If the fingerprint does not match, the session is immediately deleted from the session store and the cookie
   is expired, mitigating session hijacking attempts
 - **HttpOnly Cookies** — The session cookie is set with the `HttpOnly` flag, preventing client-side JavaScript
   from accessing the session identifier
 - **Secure Cookies** — The session cookie is marked `Secure` when the request is made over HTTPS
-- **TTL Refresh** — The session TTL is refreshed on every access via `Memcached::touch()`, keeping active
-  sessions alive while expired sessions are automatically cleaned up by Memcached. The browser cookie keeps the
+- **TTL Refresh** — The session TTL is refreshed on every access (`Memcached::touch()`, or by storing the session again
+  in APCu), keeping active sessions alive while expired sessions are automatically cleaned up by the store. The browser cookie keeps the
   expiry it was created with unless `MEMCACHED_SESSION_SLIDING=1`, which renews it with the attributes (path, domain,
   `SameSite`, …) the session was created with
 - **IP Binding** — By default the fingerprint includes the client IP, so a session ends when the user's address
@@ -2461,7 +2463,9 @@ DynamicalWeb's internal session entries:
 |------------------------|-----------|--------------------------------------------------|
 | `MEMCACHED_KEY_PREFIX` | `dw_app_` | Prefix applied to every key stored by `Memcache` |
 
-All methods silently no-op when Memcached is unavailable or disabled, so applications keep working without it.
+When Memcached is disabled or unavailable, entries are kept in APCu instead (with the same key prefix) if APCu is
+available, which is shared by the requests of one server process. When neither is available, all methods silently
+no-op, so applications keep working without a cache.
 
 ```php
 <?php
@@ -2489,8 +2493,9 @@ All methods silently no-op when Memcached is unavailable or disabled, so applica
 | Method                                                                         | Return Type      | Description                                                                |
 |--------------------------------------------------------------------------------|------------------|----------------------------------------------------------------------------|
 | `isExtensionAvailable()`                                                       | `bool`           | Returns true if the Memcached extension is loaded                          |
-| `isAvailable()`                                                                | `bool`           | Returns true if Memcached is enabled and the client was initialized        |
-| `getClient()`                                                                  | `?Memcached`     | Returns the underlying client for advanced usage (keys are still prefixed) |
+| `isAvailable()`                                                                | `bool`           | Returns true if Memcached or the APCu fallback can be used                 |
+| `isUsingApcu()`                                                                | `bool`           | Returns true if entries are kept in APCu because Memcached is unavailable  |
+| `getClient()`                                                                  | `?Memcached`     | Returns the Memcached client for advanced usage (keys are still prefixed), null with APCu |
 | `getKeyPrefix()`                                                               | `string`         | Returns the configured key prefix                                          |
 | `fetch(string $key, mixed &$success = false)`                                  | `mixed`          | Returns the cached value, or false on a miss                               |
 | `store(string $key, mixed $value, int $ttl = 0)`                               | `bool`           | Stores a value, overwriting any existing one                               |
@@ -2503,7 +2508,7 @@ All methods silently no-op when Memcached is unavailable or disabled, so applica
 | `decrement(string $key, int $offset = 1, int $initial = 0, int $ttl = 0)`      | `int\|false`     | Decrements a counter (never below zero), initializing it if missing        |
 | `touch(string $key, int $ttl)`                                                 | `bool`           | Updates the TTL of an existing entry                                       |
 | `remember(string $key, int $ttl, callable $callback)`                          | `mixed`          | Returns the cached value or computes, stores and returns it                |
-| `stats()`                                                                      | `array\|false`   | Returns Memcached server statistics                                        |
+| `stats()`                                                                      | `array\|false`   | Returns Memcached server statistics (false with APCu)                      |
 
 
 ## Deployment
