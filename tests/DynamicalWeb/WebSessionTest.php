@@ -9,7 +9,7 @@
 
     class WebSessionTest extends TestCase
     {
-        private const array ENV_KEYS = ['MEMCACHED_ENABLED'];
+        private const array ENV_KEYS = ['MEMCACHED_ENABLED', 'SESSION_BACKEND'];
 
         private static array $originalEnv = [];
 
@@ -37,6 +37,7 @@
 
         private function enableSessions(array $requestOptions = []): void
         {
+            putenv('SESSION_BACKEND');
             putenv('MEMCACHED_ENABLED=1');
             FakeMemcached::reset();
             WebSessionFixture::install(WebSessionFixture::makeRequest($requestOptions));
@@ -45,6 +46,7 @@
         private function disableSessions(): void
         {
             putenv('MEMCACHED_ENABLED');
+            putenv('SESSION_BACKEND=none');
             WebSessionFixture::install(WebSessionFixture::makeRequest());
         }
 

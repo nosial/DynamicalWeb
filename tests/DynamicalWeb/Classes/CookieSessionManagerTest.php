@@ -12,7 +12,7 @@
 
     class CookieSessionManagerTest extends TestCase
     {
-        private const array ENV_KEYS = ['MEMCACHED_ENABLED', 'MEMCACHED_SESSION_TTL', 'MEMCACHED_SESSION_SLIDING', 'MEMCACHED_SESSION_BIND_IP'];
+        private const array ENV_KEYS = ['MEMCACHED_ENABLED', 'MEMCACHED_SESSION_TTL', 'MEMCACHED_SESSION_SLIDING', 'MEMCACHED_SESSION_BIND_IP', 'SESSION_BACKEND'];
 
         private static array $originalEnv = [];
 
@@ -226,5 +226,85 @@
             $next = WebSessionFixture::nextRequest($created, ['method' => RequestMethod::WEBSOCKET]);
             $this->assertSame(1, WebSession::getCookieSession()?->get('user'));
             $this->assertNull($next->getCookie('web_session'));
+        }
+
+        // Session stores
+
+        public function testMemcachedIsUsedWhenEnabled(): void
+        {
+            $this->assertSame('memcached', WebSession::getCookieSessionManager()->getBackend());
+        }
+
+        public function testSessionBackendNoneDisablesSessions(): void
+        {
+            putenv('SESSION_BACKEND=none');
+            WebSessionFixture::install(WebSessionFixture::makeRequest());
+
+            $this->assertNull((new CookieSessionManager())->getBackend());
+            $this->assertNull(WebSession::createCookieSession(['user' => 1]));
+        }
+
+        public function testApcuIsUsedWhenMemcachedIsDisabled(): void
+        {
+            $this->requireApcu();
+            putenv('MEMCACHED_ENABLED');
+            WebSessionFixture::install(WebSessionFixture::makeRequest());
+
+            $this->assertSame('apcu', WebSession::getCookieSessionManager()?->getBackend());
+        }
+
+        public function testSessionBackendApcuOverridesMemcached(): void
+        {
+            $this->requireApcu();
+            putenv('SESSION_BACKEND=apcu');
+            WebSessionFixture::install(WebSessionFixture::makeRequest());
+
+            $this->assertSame('apcu', WebSession::getCookieSessionManager()?->getBackend());
+        }
+
+        public function testApcuSessionLifecycle(): void
+        {
+            $this->requireApcu();
+            putenv('MEMCACHED_ENABLED');
+            WebSessionFixture::install(WebSessionFixture::makeRequest());
+
+            $created = WebSession::getResponse();
+            $session = WebSession::createCookieSession(['user' => 1]);
+            $this->assertNotNull($session);
+            $this->assertTrue(apcu_exists('dw_sess_' . $session->getSessionId()));
+
+            WebSessionFixture::nextRequest($created);
+            $this->assertTrue(WebSession::hasCookieSession());
+            $this->assertSame(1, WebSession::getCookieSession()?->get('user'));
+
+            $this->assertTrue(WebSession::destroyCookieSession());
+            $this->assertFalse(apcu_exists('dw_sess_' . $session->getSessionId()));
+        }
+
+        public function testApcuSessionFingerprintMismatchDeletesSession(): void
+        {
+            $this->requireApcu();
+            putenv('MEMCACHED_ENABLED');
+            WebSessionFixture::install(WebSessionFixture::makeRequest());
+
+            $created = WebSession::getResponse();
+            $session = WebSession::createCookieSession(['user' => 1]);
+
+            WebSessionFixture::nextRequest($created, ['user_agent' => 'OtherAgent/2.0']);
+            $this->assertNull(WebSession::getCookieSession());
+            $this->assertFalse(apcu_exists('dw_sess_' . $session->getSessionId()));
+        }
+
+        /**
+         * Skips the test unless APCu is enabled in the CLI (run PHPUnit with -d apc.enable_cli=1).
+         */
+        private function requireApcu(): void
+        {
+            if (!Apcu::isExtensionAvailable())
+            {
+                $this->markTestSkipped('APCu is not enabled in the CLI, run with -d apc.enable_cli=1');
+            }
+
+            apcu_clear_cache();
         }
     }

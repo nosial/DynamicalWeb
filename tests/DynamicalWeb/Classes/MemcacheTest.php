@@ -45,6 +45,7 @@
             $reflection = new ReflectionClass(Memcache::class);
             $reflection->getProperty('memcached')->setValue(null, null);
             $reflection->getProperty('initialized')->setValue(null, false);
+            $reflection->getProperty('useApcu')->setValue(null, false);
             $reflection->getProperty('keyPrefix')->setValue(null, 'dw_app_');
         }
 
@@ -66,12 +67,14 @@
 
         public function testUnavailableWhenEnvNotSet(): void
         {
+            $this->requireNoApcu();
             $this->assertFalse(Memcache::isAvailable());
             $this->assertNull(Memcache::getClient());
         }
 
         public function testUnavailableWhenEnvDisabled(): void
         {
+            $this->requireNoApcu();
             foreach (['0', 'false', 'no', 'off', 'garbage'] as $value)
             {
                 putenv('MEMCACHED_ENABLED=' . $value);
@@ -92,6 +95,7 @@
 
         public function testMethodsNoOpWhenUnavailable(): void
         {
+            $this->requireNoApcu();
             $success = true;
             $this->assertFalse(Memcache::fetch('key', $success));
             $this->assertFalse($success);
@@ -109,6 +113,7 @@
 
         public function testRememberInvokesCallbackEveryTimeWhenUnavailable(): void
         {
+            $this->requireNoApcu();
             $calls = 0;
             $callback = function () use (&$calls) { return ++$calls; };
 
@@ -297,5 +302,118 @@
             $this->enableMemcache();
 
             $this->assertSame(Memcache::getClient(), Memcache::getClient());
+        }
+
+        // APCu fallback
+
+        public function testApcuFallbackWhenMemcachedDisabled(): void
+        {
+            $this->requireApcu();
+
+            $this->assertTrue(Memcache::isAvailable());
+            $this->assertTrue(Memcache::isUsingApcu());
+            $this->assertNull(Memcache::getClient());
+        }
+
+        public function testApcuNotUsedWhenMemcachedEnabled(): void
+        {
+            $this->enableMemcache();
+
+            $this->assertFalse(Memcache::isUsingApcu());
+        }
+
+        public function testApcuStoreFetchAddDelete(): void
+        {
+            $this->requireApcu();
+
+            $this->assertTrue(Memcache::store('key', ['a' => 1]));
+            $this->assertSame(['a' => 1], apcu_fetch('dw_app_key'));
+            $this->assertSame(['a' => 1], Memcache::fetch('key', $success));
+            $this->assertTrue($success);
+
+            $this->assertTrue(Memcache::store('false', false));
+            $this->assertFalse(Memcache::fetch('false', $success));
+            $this->assertTrue($success);
+
+            $this->assertFalse(Memcache::add('key', 'other'));
+            $this->assertTrue(Memcache::add('new', 'value'));
+            $this->assertTrue(Memcache::exists('new'));
+            $this->assertTrue(Memcache::delete('new'));
+            $this->assertFalse(Memcache::exists('new'));
+            $this->assertFalse(Memcache::fetch('missing', $success));
+            $this->assertFalse($success);
+        }
+
+        public function testApcuCustomKeyPrefix(): void
+        {
+            putenv('MEMCACHED_KEY_PREFIX=custom_');
+            $this->requireApcu();
+
+            Memcache::store('key', 'value');
+            $this->assertSame('value', apcu_fetch('custom_key'));
+            $this->assertFalse(apcu_exists('dw_app_key'));
+        }
+
+        public function testApcuMultipleOperations(): void
+        {
+            $this->requireApcu();
+
+            $this->assertTrue(Memcache::storeMultiple(['a' => 1, 'b' => 2]));
+            $this->assertSame(['a' => 1, 'b' => 2], Memcache::fetchMultiple(['a', 'b', 'c']));
+            $this->assertSame([], Memcache::fetchMultiple([]));
+        }
+
+        public function testApcuIncrementAndDecrement(): void
+        {
+            $this->requireApcu();
+
+            $this->assertSame(0, Memcache::increment('counter'));
+            $this->assertSame(1, Memcache::increment('counter'));
+            $this->assertSame(6, Memcache::increment('counter', 5));
+            $this->assertSame(10, Memcache::increment('other', 1, 10));
+
+            $this->assertSame(5, Memcache::decrement('down', 1, 5));
+            $this->assertSame(3, Memcache::decrement('down', 2));
+            $this->assertSame(0, Memcache::decrement('down', 10));
+        }
+
+        public function testApcuTouchAndRemember(): void
+        {
+            $this->requireApcu();
+
+            $this->assertFalse(Memcache::touch('missing', 10));
+            Memcache::store('key', 'value', 10);
+            $this->assertTrue(Memcache::touch('key', 60));
+            $this->assertSame('value', Memcache::fetch('key'));
+
+            $calls = 0;
+            $callback = function () use (&$calls) { return ++$calls; };
+            $this->assertSame(1, Memcache::remember('remembered', 60, $callback));
+            $this->assertSame(1, Memcache::remember('remembered', 60, $callback));
+        }
+
+        /**
+         * Skips the test unless APCu is enabled in the CLI (run PHPUnit with -d apc.enable_cli=1).
+         */
+        private function requireApcu(): void
+        {
+            if (!Apcu::isExtensionAvailable())
+            {
+                $this->markTestSkipped('APCu is not enabled in the CLI, run with -d apc.enable_cli=1');
+            }
+
+            apcu_clear_cache();
+            self::resetMemcache();
+        }
+
+        /**
+         * Skips the test when APCu is enabled in the CLI, since Memcache then falls back to it.
+         */
+        private function requireNoApcu(): void
+        {
+            if (Apcu::isExtensionAvailable())
+            {
+                $this->markTestSkipped('APCu is enabled in the CLI, Memcache falls back to it');
+            }
         }
     }
