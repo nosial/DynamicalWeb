@@ -5,16 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.23] - Ongoing
+## [1.0.23] - 2026-11-18
 
-This update introduces support for rendering markdown files
+This update introduces support for rendering markdown files and an APCu fallback for Cookie Sessions and the cache
 
 ### Added
  - Added `Functions::printMarkdown()` and `Functions::getMarkdown()` to render Markdown from a local file or any URL
    `file_get_contents()` supports (http, https, ftp, file, data, ...) as HTML, sanitized by default
  - Added `DynamicalWeb\Classes\MarkdownRenderer` to render Markdown strings, backed by `fastvolt/markdown`
+ - Cookie Sessions are stored in APCu when Memcached is not enabled, so applications served by a single process have 
+   sessions without a Memcached server. APCu sessions
+   are lost when the process restarts
+ - Added the `SESSION_BACKEND` environment variable (`memcached`, `apcu` or `none`) to force the session store
+ - Added `CookieSessionManager::getBackend()` and `Memcache::isUsingApcu()`
 
 ### Changed
+ - `Memcache` keeps entries in APCu (with the same key prefix) when Memcached is not enabled, instead of doing nothing
  - `Functions::insertSection()` now resolves relative paths through the same helper as `Functions::getMarkdown()`; when
    called outside of an executing page, relative paths resolve against the calling file instead of one frame above it
 
